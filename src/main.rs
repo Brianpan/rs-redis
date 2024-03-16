@@ -12,8 +12,8 @@ fn main() -> std::io::Result<()> {
 
     for stream in listener.incoming() {
         match stream {
-            Ok(_stream) => {
-                println!("new connection");
+            Ok(stream) => {
+                handle_connection(stream);
             }
             Err(e) => {
                 println!("error: {}", e);
