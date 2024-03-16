@@ -1,7 +1,11 @@
-// Uncomment this block to pass the first stage
-// use std::net::TcpListener;
+use std::io::Write;
+use std::net::{TcpListener, TcpStream};
 
-use std::net::TcpListener;
+fn handle_connection(mut stream: TcpStream) {
+    let resp = "+PONG\r\n";
+
+    stream.write_all(resp.as_bytes()).unwrap();
+}
 
 fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
