@@ -14,15 +14,22 @@ fn handle_connection(mut stream: TcpStream) {
                 if n == 0 {
                     break;
                 } else {
-                    for u in buf.iter().take(n) {
+                    let mut maybe_end = false;
+                    while let Some(u) = buf.first() {
                         let c = *u as char;
-
-                        if c == '\n' {
+                        if c == '\r' {
+                            maybe_end = true;
+                        } else if c == '\n' {
+                            if !maybe_end {
+                                break;
+                            }
                             let check_cmd = cmd.to_lowercase();
                             if check_cmd == "ping" {
                                 stream.write_all(resp.as_bytes()).unwrap();
                             }
-                            cmd = String::new();
+
+                            maybe_end = false;
+                            cmd.clear();
                         } else {
                             cmd.push(c);
                         }
