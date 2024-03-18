@@ -1,10 +1,41 @@
+use std::io::Read;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 
 fn handle_connection(mut stream: TcpStream) {
+    let mut cmd = String::new();
     let resp = "+PONG\r\n";
+    let mut buf = [0; 1024];
 
-    stream.write_all(resp.as_bytes()).unwrap();
+    loop {
+        let chrs = stream.read(&mut buf);
+        match chrs {
+            Ok(n) => {
+                if n == 0 {
+                    break;
+                } else {
+                    for u in buf.iter().take(n) {
+                        let c = *u as char;
+
+                        if c == '\n' {
+                            match cmd.as_str() {
+                                "PING" => {
+                                    stream.write_all(resp.as_bytes()).unwrap();
+                                }
+                                _ => {}
+                            }
+                            cmd = String::new();
+                        } else {
+                            cmd.push(c);
+                        }
+                    }
+                }
+            }
+            Err(_) => {
+                break;
+            }
+        }
+    }
 }
 
 fn main() -> std::io::Result<()> {
