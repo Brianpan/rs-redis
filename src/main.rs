@@ -21,7 +21,7 @@ fn handle_connection(mut stream: TcpStream) {
                             maybe_end = true;
                         } else if c == '\n' {
                             if !maybe_end {
-                                break;
+                                continue;
                             }
                             let check_cmd = cmd.to_lowercase();
                             if check_cmd == "ping" {
