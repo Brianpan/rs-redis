@@ -5,7 +5,7 @@ use std::net::{TcpListener, TcpStream};
 fn handle_connection(mut stream: TcpStream) {
     let mut cmd = String::new();
     let resp = "+PONG\r\n";
-    let mut buf = [0; 1024];
+    let mut buf = [0; 512];
 
     loop {
         let chrs = stream.read(&mut buf);
@@ -22,7 +22,6 @@ fn handle_connection(mut stream: TcpStream) {
                             if check_cmd == "ping" {
                                 stream.write_all(resp.as_bytes()).unwrap();
                             }
-
                             cmd = String::new();
                         } else {
                             cmd.push(c);
