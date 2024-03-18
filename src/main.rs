@@ -18,15 +18,21 @@ fn handle_connection(mut stream: TcpStream) {
                         let c = *u as char;
 
                         if c == '\n' {
-                            match cmd.as_str() {
-                                "PING" => {
-                                    stream.write_all(resp.as_bytes()).unwrap();
-                                }
-                                _ => {}
+                            let check_cmd = cmd.to_lowercase();
+                            if check_cmd == "ping" {
+                                stream.write_all(resp.as_bytes()).unwrap();
                             }
+
                             cmd = String::new();
                         } else {
                             cmd.push(c);
+                        }
+                    }
+
+                    if !cmd.is_empty() {
+                        let check_cmd = cmd.to_lowercase();
+                        if check_cmd == "ping" {
+                            stream.write_all(resp.as_bytes()).unwrap();
                         }
                     }
                 }
