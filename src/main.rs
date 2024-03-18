@@ -14,21 +14,20 @@ fn handle_connection(mut stream: TcpStream) {
                 if n == 0 {
                     break;
                 } else {
-                    let mut maybe_end = false;
-                    while let Some(u) = buf.first() {
+                    for u in buf.iter().take(n) {
                         let c = *u as char;
                         if c == '\r' {
-                            maybe_end = true;
+                            continue;
                         } else if c == '\n' {
-                            if !maybe_end {
-                                continue;
-                            }
+                            // if !maybe_end {
+                            // continue;
+                            // }
                             let check_cmd = cmd.to_lowercase();
                             if check_cmd == "ping" {
+                                println!("{}", check_cmd);
                                 stream.write_all(resp.as_bytes()).unwrap();
                             }
 
-                            maybe_end = false;
                             cmd.clear();
                         } else {
                             cmd.push(c);
@@ -38,6 +37,7 @@ fn handle_connection(mut stream: TcpStream) {
                     if !cmd.is_empty() {
                         let check_cmd = cmd.to_lowercase();
                         if check_cmd == "ping" {
+                            println!("{}", check_cmd);
                             stream.write_all(resp.as_bytes()).unwrap();
                         }
                     }
