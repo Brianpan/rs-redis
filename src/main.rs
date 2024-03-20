@@ -1,14 +1,21 @@
-use std::io::Read;
-use std::io::Write;
-use std::net::{TcpListener, TcpStream};
+use anyhow::Result;
 
-fn handle_connection(mut stream: TcpStream) {
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
+
+#[warn(unused_variables)]
+fn command_handler(_cmd: &str) -> Result<String> {
+    // match cmd.to_lowercase() {
+    //     _ => Ok("+PONG\r\n".to_string()),
+    // }
+    Ok("+PONG\r\n".to_string())
+}
+async fn handle_connection(mut stream: TcpStream) {
     let mut cmd = String::new();
-    let resp = "+PONG\r\n";
     let mut buf = [0; 512];
 
     loop {
-        let chrs = stream.read(&mut buf);
+        let chrs = stream.read(&mut buf).await;
         match chrs {
             Ok(n) => {
                 if n == 0 {
@@ -19,13 +26,8 @@ fn handle_connection(mut stream: TcpStream) {
                         if c == '\r' {
                             continue;
                         } else if c == '\n' {
-                            // if !maybe_end {
-                            // continue;
-                            // }
-                            let check_cmd = cmd.to_lowercase();
-                            if check_cmd == "ping" {
-                                println!("{}", check_cmd);
-                                stream.write_all(resp.as_bytes()).unwrap();
+                            if let Ok(resp) = command_handler(&cmd) {
+                                stream.write_all(resp.as_bytes()).await.unwrap();
                             }
 
                             cmd.clear();
@@ -35,10 +37,8 @@ fn handle_connection(mut stream: TcpStream) {
                     }
 
                     if !cmd.is_empty() {
-                        let check_cmd = cmd.to_lowercase();
-                        if check_cmd == "ping" {
-                            println!("{}", check_cmd);
-                            stream.write_all(resp.as_bytes()).unwrap();
+                        if let Ok(resp) = command_handler(&cmd) {
+                            stream.write_all(resp.as_bytes()).await.unwrap();
                         }
                     }
                 }
@@ -50,33 +50,14 @@ fn handle_connection(mut stream: TcpStream) {
     }
 }
 
-fn main() -> std::io::Result<()> {
-    let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
+#[tokio::main]
+async fn main() -> std::io::Result<()> {
+    let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
 
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                handle_connection(stream);
-            }
-            Err(e) => {
-                println!("error: {}", e);
-            }
-        }
+    loop {
+        let (socket, _) = listener.accept().await.unwrap();
+        tokio::spawn(async move {
+            handle_connection(socket).await;
+        });
     }
-
-    Ok(())
-    // Uncomment this block to pass the first stage
-    //
-    // let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
-    //
-    // for stream in listener.incoming() {
-    //     match stream {
-    //         Ok(_stream) => {
-    //             println!("accepted new connection");
-    //         }
-    //         Err(e) => {
-    //             println!("error: {}", e);
-    //         }
-    //     }
-    // }
 }
