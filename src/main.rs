@@ -3,12 +3,11 @@ use anyhow::Result;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
-#[warn(unused_variables)]
-fn command_handler(_cmd: &str) -> Result<String> {
-    // match cmd.to_lowercase() {
-    //     _ => Ok("+PONG\r\n".to_string()),
-    // }
-    Ok("+PONG\r\n".to_string())
+fn command_handler(cmd: &str) -> Result<String> {
+    match cmd.to_lowercase().as_str() {
+        "ping" => Ok("+PONG\r\n".to_string()),
+        _ => Ok("".to_string()),
+    }
 }
 async fn handle_connection(mut stream: TcpStream) {
     let mut cmd = String::new();
