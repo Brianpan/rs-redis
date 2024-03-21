@@ -14,7 +14,7 @@ enum RespParsingState {
     End,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 enum RespType {
     Unknown,
     Integer,
@@ -148,7 +148,33 @@ fn command_handler(cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
         }
         RespType::Array => {
             // TODO
-            Ok("*0\r\n".to_string())
+            match cmd.read().unwrap().vec_data[0].resp_type {
+                RespType::BulkString => {
+                    return match cmd.read().unwrap().vec_data[0]
+                        .str_data
+                        .to_lowercase()
+                        .as_str()
+                    {
+                        "" => Ok("+OK\r\n".to_string()),
+                        "get" => Ok("$5\r\nhello\r\n".to_string()),
+                        "ping" => Ok("+PONG\r\n".to_string()),
+                        "echo" => {
+                            let mut ret = String::new();
+                            for i in 1..cmd.read().unwrap().vec_data.len() {
+                                ret.push_str(&format!(
+                                    "${}\r\n{}\r\n",
+                                    cmd.read().unwrap().vec_data[i].str_data.len(),
+                                    cmd.read().unwrap().vec_data[i].str_data
+                                ));
+                            }
+                            Ok(ret)
+                        }
+                        _ => Ok("*0\r\n".to_string()),
+                    }
+                }
+                _ => return Ok("*0\r\n".to_string()),
+            }
+            // Ok("*0\r\n".to_string())
         }
         _ => Err(anyhow::anyhow!("Unknown command")),
     };
@@ -192,7 +218,7 @@ async fn handle_connection(mut stream: TcpStream) {
 
                                 if resp.read().unwrap().state == RespParsingState::End {
                                     // cmd_stack.pop_back();
-                                    if let Some(parent) = cmd_stack.back() {
+                                    if let Some(parent) = cmd_stack.pop_back() {
                                         if parent.read().unwrap().int_data > 0 {
                                             parent.write().unwrap().int_data -= 1;
                                             parent
@@ -204,7 +230,6 @@ async fn handle_connection(mut stream: TcpStream) {
 
                                         if parent.read().unwrap().int_data == 0 {
                                             // move the array type out of the stack
-                                            // cmd_stack.pop_back();
                                             parent.write().unwrap().state = RespParsingState::End;
                                             if cmd_stack.len() == 0 {
                                                 let resp = command_handler(parent.clone());
@@ -215,6 +240,8 @@ async fn handle_connection(mut stream: TcpStream) {
                                                         .unwrap();
                                                 }
                                             }
+                                        } else {
+                                            cmd_stack.push_back(parent);
                                         }
                                     } else if let Ok(resp) = command_handler(resp) {
                                         stream.write_all(resp.as_bytes()).await.unwrap();
@@ -223,8 +250,13 @@ async fn handle_connection(mut stream: TcpStream) {
                                     // next cmd is a new RespMessage
                                     cmd_stack.push_back(Arc::new(RwLock::new(RespMessage::new())));
                                 } else {
-                                    // put current resp back to the stack
-                                    cmd_stack.push_back(resp);
+                                    if resp.read().unwrap().resp_type == RespType::Array {
+                                        cmd_stack.push_back(resp);
+                                        cmd_stack
+                                            .push_back(Arc::new(RwLock::new(RespMessage::new())));
+                                    } else {
+                                        cmd_stack.push_back(resp);
+                                    }
                                 }
 
                                 cmd.clear();
