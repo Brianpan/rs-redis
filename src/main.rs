@@ -133,11 +133,19 @@ fn command_handler(cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
         RespType::SimpleString => Ok("+OK\r\n".to_string()),
         RespType::Error => Ok("-ERR\r\n".to_string()),
         RespType::Integer => Ok(format!(":{}\r\n", cmd.read().unwrap().int_data)),
-        RespType::BulkString => Ok(format!(
-            "${}\r\n{}\r\n",
-            cmd.read().unwrap().str_data.len(),
-            "PONG"
-        )),
+        RespType::BulkString => {
+            match cmd
+                .read()
+                .unwrap()
+                .str_data
+                .as_str()
+                .to_lowercase()
+                .as_str()
+            {
+                "ping" => Ok("+PONG\r\n".to_string()),
+                _ => Err(anyhow::anyhow!("Unknown command")),
+            }
+        }
         RespType::Array => {
             // TODO
             Ok("*0\r\n".to_string())
