@@ -1,13 +1,15 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, RwLock};
 
+use crate::store::engine::StoreEngine;
+
 use super::commands::command_handler;
 use super::{RespMessage, RespParsingState, RespType};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-pub async fn handle_connection(mut stream: TcpStream) {
+pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream) {
     let mut cmd = String::new();
     let mut buf = [0; 512];
     let mut maybe_split = false;
@@ -57,7 +59,7 @@ pub async fn handle_connection(mut stream: TcpStream) {
                                             // move the array type out of the stack
                                             parent.write().unwrap().state = RespParsingState::End;
                                             if cmd_stack.len() == 0 {
-                                                let resp = command_handler(parent.clone());
+                                                let resp = command_handler(db, parent.clone());
                                                 if let Ok(resp) = resp {
                                                     stream
                                                         .write_all(resp.as_bytes())
@@ -68,7 +70,7 @@ pub async fn handle_connection(mut stream: TcpStream) {
                                         } else {
                                             cmd_stack.push_back(parent);
                                         }
-                                    } else if let Ok(resp) = command_handler(resp) {
+                                    } else if let Ok(resp) = command_handler(db, resp) {
                                         stream.write_all(resp.as_bytes()).await.unwrap();
                                     }
 

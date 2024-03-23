@@ -1,10 +1,12 @@
 use std::sync::{Arc, RwLock};
 
+use crate::store::engine::StoreEngine;
+
 use super::{RespMessage, RespType};
 
 use anyhow::Result;
 
-pub fn command_handler(cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
+pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
     let ret = match cmd.read().unwrap().resp_type {
         RespType::SimpleString => Ok("+OK\r\n".to_string()),
         RespType::Error => Ok("-ERR\r\n".to_string()),
@@ -32,7 +34,21 @@ pub fn command_handler(cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
                         .as_str()
                     {
                         "" => Ok("+OK\r\n".to_string()),
-                        "get" => Ok("$5\r\nhello\r\n".to_string()),
+                        "get" => {
+                            let key = cmd.read().unwrap().vec_data[1].str_data.clone();
+                            match db.get(&key) {
+                                Some(val) => Ok(format!("${}\r\n{}\r\n", val.len(), val)),
+                                None => Ok("$-1\r\n".to_string()),
+                            }
+                        }
+                        "set" => {
+                            let db = db.clone();
+                            let key = cmd.read().unwrap().vec_data[1].str_data.clone();
+                            let val = cmd.read().unwrap().vec_data[2].str_data.clone();
+                            db.set(key, val);
+
+                            Ok("+Ok\r\n".to_string())
+                        }
                         "ping" => Ok("+PONG\r\n".to_string()),
                         "echo" => {
                             let mut ret = String::new();
