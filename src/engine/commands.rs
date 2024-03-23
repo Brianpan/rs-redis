@@ -6,10 +6,21 @@ use super::{RespMessage, RespType};
 
 use anyhow::Result;
 
+// command consts
+const COMMAND_GET: &str = "get";
+const COMMAND_SET: &str = "set";
+const COMMAND_PING: &str = "ping";
+const COMMAND_ECHO: &str = "echo";
+
+const RESP_OK: &str = "+OK\r\n";
+const RESP_ERR: &str = "-ERR\r\n";
+const RESP_PONG: &str = "+PONG\r\n";
+const RESP_EMPTY: &str = "*0\r\n";
+
 pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
     let ret = match cmd.read().unwrap().resp_type {
-        RespType::SimpleString => Ok("+OK\r\n".to_string()),
-        RespType::Error => Ok("-ERR\r\n".to_string()),
+        RespType::SimpleString => Ok(RESP_OK.to_string()),
+        RespType::Error => Ok(RESP_ERR.to_string()),
         RespType::Integer => Ok(format!(":{}\r\n", cmd.read().unwrap().int_data)),
         RespType::BulkString => {
             match cmd
@@ -20,7 +31,7 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
                 .to_lowercase()
                 .as_str()
             {
-                "ping" => Ok("+PONG\r\n".to_string()),
+                "ping" => Ok(RESP_PONG.to_string()),
                 _ => Err(anyhow::anyhow!("Unknown command")),
             }
         }
@@ -33,24 +44,30 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
                         .to_lowercase()
                         .as_str()
                     {
-                        "" => Ok("+OK\r\n".to_string()),
-                        "get" => {
+                        "" => Ok(RESP_OK.to_string()),
+                        COMMAND_GET => {
                             let key = cmd.read().unwrap().vec_data[1].str_data.clone();
                             match db.get(&key) {
                                 Some(val) => Ok(format!("${}\r\n{}\r\n", val.len(), val)),
                                 None => Ok("$-1\r\n".to_string()),
                             }
                         }
-                        "set" => {
+                        COMMAND_SET => {
                             let db = db.clone();
                             let key = cmd.read().unwrap().vec_data[1].str_data.clone();
+
+                            // no value included
+                            if cmd.read().unwrap().vec_data.len() < 3 {
+                                return Ok(RESP_ERR.to_string());
+                            }
+
                             let val = cmd.read().unwrap().vec_data[2].str_data.clone();
                             db.set(key, val);
 
-                            Ok("+Ok\r\n".to_string())
+                            Ok(RESP_OK.to_string())
                         }
-                        "ping" => Ok("+PONG\r\n".to_string()),
-                        "echo" => {
+                        COMMAND_PING => Ok(RESP_PONG.to_string()),
+                        COMMAND_ECHO => {
                             let mut ret = String::new();
                             for i in 1..cmd.read().unwrap().vec_data.len() {
                                 ret.push_str(&format!(
@@ -61,12 +78,11 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
                             }
                             Ok(ret)
                         }
-                        _ => Ok("*0\r\n".to_string()),
-                    }
+                        _ => Ok(RESP_EMPTY.to_string()),
+                    };
                 }
-                _ => return Ok("*0\r\n".to_string()),
+                _ => return Ok(RESP_EMPTY.to_string()),
             }
-            // Ok("*0\r\n".to_string())
         }
         _ => Err(anyhow::anyhow!("Unknown command")),
     };
