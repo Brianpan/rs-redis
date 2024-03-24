@@ -66,7 +66,7 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
                             if cmd_len == 5
                                 && cmd.read().unwrap().vec_data[3].str_data.to_lowercase() == "px"
                             {
-                                let ttl = cmd.read().unwrap().vec_data[3]
+                                let ttl = cmd.read().unwrap().vec_data[4]
                                     .str_data
                                     .parse::<u128>()
                                     .unwrap();
