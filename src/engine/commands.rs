@@ -62,7 +62,16 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
                             }
 
                             let val = cmd.read().unwrap().vec_data[2].str_data.clone();
-                            db.set(key, val);
+                            let cmd_len = cmd.read().unwrap().vec_data.len();
+                            if cmd_len == 4 {
+                                let ttl = cmd.read().unwrap().vec_data[3]
+                                    .str_data
+                                    .parse::<u128>()
+                                    .unwrap();
+                                db.set_with_expire(key, val, ttl);
+                            } else {
+                                db.set(key, val);
+                            }
 
                             Ok(RESP_OK.to_string())
                         }

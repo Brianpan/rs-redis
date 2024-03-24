@@ -22,6 +22,7 @@ pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream) {
     cmd_stack.push_back(Arc::new(RwLock::new(RespMessage::new())));
 
     loop {
+        let _ = stream.readable().await;
         let chrs = stream.read(&mut buf).await;
         match chrs {
             Ok(n) => {
@@ -58,7 +59,7 @@ pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream) {
                                         if parent.read().unwrap().int_data == 0 {
                                             // move the array type out of the stack
                                             parent.write().unwrap().state = RespParsingState::End;
-                                            if cmd_stack.len() == 0 {
+                                            if cmd_stack.is_empty() {
                                                 let resp = command_handler(db, parent.clone());
                                                 if let Ok(resp) = resp {
                                                     stream
