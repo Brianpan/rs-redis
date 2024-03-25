@@ -43,7 +43,7 @@ impl StoreEngine {
     }
 
     pub async fn expired_reaper(&self) {
-        let sleep_time = Duration::from_millis(10);
+        let sleep_time = Duration::from_millis(5);
         loop {
             tokio::time::sleep(sleep_time).await;
             let sys_time = SystemTime::now();
