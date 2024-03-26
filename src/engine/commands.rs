@@ -11,6 +11,7 @@ const COMMAND_GET: &str = "get";
 const COMMAND_SET: &str = "set";
 const COMMAND_PING: &str = "ping";
 const COMMAND_ECHO: &str = "echo";
+const COMMAND_INFO: &str = "info";
 
 const RESP_OK: &str = "+OK\r\n";
 const RESP_ERR: &str = "-ERR\r\n";
@@ -48,7 +49,7 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
                         COMMAND_GET => {
                             let key = cmd.read().unwrap().vec_data[1].str_data.clone();
                             match db.get(&key) {
-                                Some(val) => Ok(format!("${}\r\n{}\r\n", val.len(), val)),
+                                Some(val) => Ok(string_to_bulk_string(val)),
                                 None => Ok("$-1\r\n".to_string()),
                             }
                         }
@@ -81,14 +82,13 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
                         COMMAND_ECHO => {
                             let mut ret = String::new();
                             for i in 1..cmd.read().unwrap().vec_data.len() {
-                                ret.push_str(&format!(
-                                    "${}\r\n{}\r\n",
-                                    cmd.read().unwrap().vec_data[i].str_data.len(),
-                                    cmd.read().unwrap().vec_data[i].str_data
+                                ret.push_str(&string_to_bulk_string(
+                                    cmd.read().unwrap().vec_data[i].str_data.clone(),
                                 ));
                             }
                             Ok(ret)
                         }
+                        COMMAND_INFO => handle_info(cmd.clone()),
                         _ => Ok(RESP_EMPTY.to_string()),
                     };
                 }
@@ -99,4 +99,43 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
     };
 
     ret
+}
+
+fn handle_info(cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
+    let mut lookup_keys: Vec<String> = Vec::new();
+    for i in 1..cmd.read().unwrap().vec_data.len() {
+        lookup_keys.push(cmd.read().unwrap().vec_data[i as usize].str_data.clone());
+        println!(
+            "{}",
+            cmd.read().unwrap().vec_data[i as usize].str_data.clone()
+        );
+    }
+
+    let mut ret = String::new();
+    if lookup_keys.is_empty() {
+        let db_info = "db_size: 0".to_string();
+        ret.push_str(&string_to_bulk_string(db_info));
+    } else {
+        let mut key_iter = lookup_keys.iter();
+        let mut idx = 0;
+        while let Some(k) = key_iter.next() {
+            match k.to_lowercase().as_str() {
+                "replication" => {
+                    if idx == 0 {
+                        println!("here");
+                        let replication_info = "role:master";
+                        ret.push_str(&string_to_bulk_string(replication_info.to_string()));
+                    }
+                }
+                _ => {}
+            }
+            idx += 1;
+        }
+    }
+
+    Ok(ret)
+}
+
+pub fn string_to_bulk_string(s: String) -> String {
+    format!("${}\r\n{}\r\n", s.len(), s)
 }
