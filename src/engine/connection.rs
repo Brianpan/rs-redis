@@ -42,10 +42,12 @@ pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream) {
 
                             // logic to generate RespMessage
                             if let Some(resp) = cmd_stack.pop_back() {
+                                // main function to parse the command
+                                // the result is in RespMessage
                                 resp.write().unwrap().parse(&cmd);
 
                                 if resp.read().unwrap().state == RespParsingState::End {
-                                    // cmd_stack.pop_back();
+                                    // if the parent is an array, we need to check if it's done
                                     if let Some(parent) = cmd_stack.pop_back() {
                                         if parent.read().unwrap().int_data > 0 {
                                             parent.write().unwrap().int_data -= 1;

@@ -105,10 +105,6 @@ fn handle_info(cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
     let mut lookup_keys: Vec<String> = Vec::new();
     for i in 1..cmd.read().unwrap().vec_data.len() {
         lookup_keys.push(cmd.read().unwrap().vec_data[i as usize].str_data.clone());
-        println!(
-            "{}",
-            cmd.read().unwrap().vec_data[i as usize].str_data.clone()
-        );
     }
 
     let mut ret = String::new();
@@ -122,7 +118,6 @@ fn handle_info(cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
             match k.to_lowercase().as_str() {
                 "replication" => {
                     if idx == 0 {
-                        println!("here");
                         let replication_info = "role:master";
                         ret.push_str(&string_to_bulk_string(replication_info.to_string()));
                     }
