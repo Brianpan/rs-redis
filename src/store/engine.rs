@@ -45,7 +45,6 @@ impl StoreEngine {
     pub async fn expired_reaper(&self) {
         let sleep_time = Duration::from_millis(5);
         loop {
-            tokio::time::sleep(sleep_time).await;
             let sys_time = SystemTime::now();
             let current_ms = sys_time
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -74,6 +73,7 @@ impl StoreEngine {
                 self.dict.write().unwrap().remove(&key);
                 self.expiring_queue.write().unwrap().pop();
             }
+            tokio::time::sleep(sleep_time).await;
         }
     }
 }
