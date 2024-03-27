@@ -88,7 +88,7 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
                             }
                             Ok(ret)
                         }
-                        COMMAND_INFO => handle_info(cmd.clone()),
+                        COMMAND_INFO => handle_info(&db.clone(), cmd.clone()),
                         _ => Ok(RESP_EMPTY.to_string()),
                     };
                 }
@@ -101,7 +101,7 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
     ret
 }
 
-fn handle_info(cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
+fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
     let mut lookup_keys: Vec<String> = Vec::new();
     for i in 1..cmd.read().unwrap().vec_data.len() {
         lookup_keys.push(cmd.read().unwrap().vec_data[i as usize].str_data.clone());
@@ -118,7 +118,11 @@ fn handle_info(cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
             match k.to_lowercase().as_str() {
                 "replication" => {
                     if idx == 0 {
-                        let replication_info = "role:master";
+                        // generate role info
+                        let replication_info = match db.get_replica() {
+                            crate::store::engine::ReplicaType::Master => "role:master",
+                            crate::store::engine::ReplicaType::Slave(_) => "role:slave",
+                        };
                         ret.push_str(&string_to_bulk_string(replication_info.to_string()));
                     }
                 }

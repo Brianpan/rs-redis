@@ -5,9 +5,17 @@ use std::sync::RwLock;
 use std::time::*;
 
 // https://github.com/tokio-rs/tokio/blob/master/examples/tinydb.rs
+
+#[derive(Clone)]
+pub enum ReplicaType {
+    Master,
+    Slave(String),
+}
+
 pub struct StoreEngine {
     dict: RwLock<HashMap<String, String>>,
     expiring_queue: RwLock<PriorityQueue<String, Reverse<u128>>>,
+    replica_info: RwLock<ReplicaType>,
 }
 
 impl StoreEngine {
@@ -15,12 +23,22 @@ impl StoreEngine {
         StoreEngine {
             dict: RwLock::new(HashMap::new()),
             expiring_queue: RwLock::new(PriorityQueue::new()),
+            replica_info: RwLock::new(ReplicaType::Master),
         }
+    }
+
+    pub fn set_replica(&self, host: String) {
+        *self.replica_info.write().unwrap() = ReplicaType::Slave(host);
+    }
+
+    pub fn get_replica(&self) -> ReplicaType {
+        self.replica_info.read().unwrap().clone()
     }
 
     pub fn get(&self, key: &str) -> Option<String> {
         let d = self.dict.read().unwrap();
         // clone the value to have new string
+        // map Option<&T> -> Option<T>
         d.get(key).cloned()
     }
 

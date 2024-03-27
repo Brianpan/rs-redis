@@ -25,14 +25,31 @@ async fn main() -> std::io::Result<()> {
                 .value_name("PORT")
                 .required(false),
         )
+        .arg(
+            Arg::new("replicaof")
+                .help("replacate from another host:port")
+                .long("replicaof")
+                .value_names([&"HOST", &"PORT"])
+                .number_of_values(2)
+                .required(false),
+        )
         .get_matches();
 
     let binding = DEFAULT_PORT.to_string();
     let redis_port = args.get_one::<String>("port").unwrap_or(&binding);
     let redis_host = format!("0.0.0.0:{}", redis_port);
+    let mut replica_host = String::new();
 
     let listener = TcpListener::bind(redis_host).await.unwrap();
     let db = Arc::new(StoreEngine::new());
+
+    // collect replicaof argument
+    if let Some(replica_info) = args.get_many::<String>("replicaof") {
+        let values: Vec<&String> = replica_info.collect();
+        replica_host = format!("{}:{}", values[0], values[1]);
+        db.set_replica(replica_host);
+    }
+
     // reaper thread
     let reaper_db = db.clone();
     spawn(async move {
