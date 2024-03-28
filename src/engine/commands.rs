@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use crate::store::engine::StoreEngine;
+use crate::store::engine::{ReplicaType, StoreEngine};
 
 use super::{RespMessage, RespType};
 
@@ -17,6 +17,10 @@ const RESP_OK: &str = "+OK\r\n";
 const RESP_ERR: &str = "-ERR\r\n";
 const RESP_PONG: &str = "+PONG\r\n";
 const RESP_EMPTY: &str = "*0\r\n";
+
+// preset id of master node (40 chars long)
+// it will be changed to a random value in the future
+const MYID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 
 pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
     let ret = match cmd.read().unwrap().resp_type {
@@ -119,11 +123,24 @@ fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<S
                 "replication" => {
                     if idx == 0 {
                         // generate role info
-                        let replication_info = match db.get_replica() {
-                            crate::store::engine::ReplicaType::Master => "role:master",
-                            crate::store::engine::ReplicaType::Slave(_) => "role:slave",
-                        };
-                        ret.push_str(&string_to_bulk_string(replication_info.to_string()));
+                        match db.get_replica() {
+                            ReplicaType::Master => {
+                                let mut master_info = String::from("role:master\r\n");
+
+                                // ret.push_str(&string_to_bulk_string(.to_string()));
+                                let master_repl_id = format!("master_replid:{}\r\n", MYID);
+
+                                // generate master_repl_id, master_repl_offset
+                                master_info = master_info + &master_repl_id;
+                                let master_repl_offset = "master_repl_offset:0".to_string();
+                                master_info = master_info + &master_repl_offset;
+
+                                ret.push_str(&string_to_bulk_string(master_info));
+                            }
+                            ReplicaType::Slave(_) => {
+                                ret.push_str(&string_to_bulk_string("role:slave".to_string()));
+                            }
+                        }
                     }
                 }
                 _ => {}
