@@ -155,3 +155,14 @@ fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<S
 pub fn string_to_bulk_string(s: String) -> String {
     format!("${}\r\n{}\r\n", s.len(), s)
 }
+
+pub fn array_to_resp_array(vec: Vec<String>) -> String {
+    let mut ret = String::new();
+    ret.push_str(format!("*{}\r\n", vec.len()).as_str());
+
+    for v in vec {
+        ret.push_str(&string_to_bulk_string(v));
+    }
+
+    return ret;
+}

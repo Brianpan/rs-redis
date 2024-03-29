@@ -2,6 +2,7 @@ mod engine;
 mod store;
 
 use clap::{Arg, Command};
+use engine::commands::array_to_resp_array;
 use engine::connection::handle_connection;
 use std::sync::Arc;
 use store::engine::StoreEngine;
@@ -47,6 +48,9 @@ async fn main() -> std::io::Result<()> {
         let values: Vec<&String> = replica_info.collect();
         let replica_host = format!("{}:{}", values[0], values[1]);
         db.set_replica(replica_host);
+
+        let ping_cmd = array_to_resp_array(vec!["PING".to_string()]);
+        let _ = db.send_resp_to_master(ping_cmd);
     }
 
     // reaper thread
