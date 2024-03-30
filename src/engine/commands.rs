@@ -12,6 +12,7 @@ const COMMAND_SET: &str = "set";
 const COMMAND_PING: &str = "ping";
 const COMMAND_ECHO: &str = "echo";
 const COMMAND_INFO: &str = "info";
+const COMMAND_REPLCONF: &str = "replconf";
 
 const RESP_OK: &str = "+OK\r\n";
 const RESP_ERR: &str = "-ERR\r\n";
@@ -93,6 +94,11 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
                             Ok(ret)
                         }
                         COMMAND_INFO => handle_info(&db.clone(), cmd.clone()),
+                        // replconf always return OK
+                        COMMAND_REPLCONF => {
+                            let ret = RESP_OK;
+                            Ok(ret.to_string())
+                        }
                         _ => Ok(RESP_EMPTY.to_string()),
                     };
                 }
@@ -126,8 +132,6 @@ fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<S
                         match db.get_replica() {
                             ReplicaType::Master => {
                                 let mut master_info = String::from("role:master\r\n");
-
-                                // ret.push_str(&string_to_bulk_string(.to_string()));
                                 let master_repl_id = format!("master_replid:{}\r\n", MYID);
 
                                 // generate master_repl_id, master_repl_offset
