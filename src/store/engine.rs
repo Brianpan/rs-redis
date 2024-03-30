@@ -83,7 +83,7 @@ impl StoreEngine {
     }
 
     pub async fn expired_reaper(&self) {
-        let sleep_time = Duration::from_millis(5);
+        let sleep_time = Duration::from_millis(3);
         loop {
             let sys_time = SystemTime::now();
             let current_ms = sys_time
