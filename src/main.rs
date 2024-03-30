@@ -5,7 +5,6 @@ use clap::{Arg, Command};
 use engine::commands::array_to_resp_array;
 use engine::connection::handle_connection;
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 use store::engine::StoreEngine;
 use tokio::{net::TcpListener, spawn};
@@ -54,7 +53,7 @@ async fn main() -> std::io::Result<()> {
         // phase 1: send PING to master
         let ping_cmd = array_to_resp_array(vec!["PING".to_string()]);
         let _ = db.send_resp_to_master(ping_cmd);
-        tokio::time::sleep(sleep_time).await;
+
         // phase 2-1: send REPLCONF listening-port
         let replconf_cmd = array_to_resp_array(vec![
             "REPLCONF".to_string(),
@@ -62,7 +61,6 @@ async fn main() -> std::io::Result<()> {
             redis_port.clone(),
         ]);
         let _ = db.send_resp_to_master(replconf_cmd);
-        tokio::time::sleep(sleep_time).await;
 
         // pase 2-2: send REPLCONF capa psync2
         let replconf_capa_cmd = array_to_resp_array(vec![
