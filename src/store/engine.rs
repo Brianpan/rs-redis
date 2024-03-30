@@ -117,10 +117,17 @@ impl StoreEngine {
         }
     }
 
-    pub fn send_resp_to_master(&self, resp: String) -> anyhow::Result<()> {
+    pub fn send_resp_to_master(
+        &self,
+        resp: String,
+        resp2: String,
+        resp3: String,
+    ) -> anyhow::Result<()> {
         if let ReplicaType::Slave(master) = self.get_replica() {
             let mut stream = TcpStream::connect(master)?;
             stream.write(resp.as_bytes())?;
+            stream.write(resp2.as_bytes())?;
+            stream.write(resp3.as_bytes())?;
         }
 
         Ok(())
