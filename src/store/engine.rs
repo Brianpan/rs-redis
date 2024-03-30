@@ -121,6 +121,7 @@ impl StoreEngine {
         if let ReplicaType::Slave(master) = self.get_replica() {
             let mut stream = TcpStream::connect(master)?;
             stream.write(resp.as_bytes())?;
+            stream.read(&mut [0; 128])?;
         }
 
         Ok(())
