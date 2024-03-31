@@ -4,7 +4,7 @@ use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::net::TcpStream;
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 use std::time::*;
 
 // https://github.com/tokio-rs/tokio/blob/master/examples/tinydb.rs
@@ -165,13 +165,45 @@ impl StoreEngine {
                 self.slave_info.read().unwrap().master_replid.clone(),
                 "-1".to_string(),
             ]);
-
+            let mut buf = [0; 128];
             stream.write(ping_cmd.as_bytes())?;
-            stream.read(&mut [0; 128])?;
+            match stream.read(&buf) {
+                Ok(buf_len) => {
+                    let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
+                    if !resp.contains("+PONG") {
+                        return Err(anyhow::anyhow!("Handshake PING failed"));
+                    }
+                }
+                Err(e) => {
+                    return e.into();
+                }
+            }
+
             stream.write(replconf_cmd.as_bytes())?;
-            stream.read(&mut [0; 128])?;
+            match stream.read(&buf) {
+                Ok(buf_len) => {
+                    let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
+                    if !resp.contains("+OK") {
+                        return Err(anyhow::anyhow!("Handshake REPLCONF listening-port failed"));
+                    }
+                }
+                Err(e) => {
+                    return e.into();
+                }
+            }
             stream.write(replconf_capa_cmd.as_bytes())?;
-            stream.read(&mut [0; 128])?;
+            match stream.read(&buf) {
+                Ok(buf_len) => {
+                    let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
+                    if !resp.contains("+OK") {
+                        return Err(anyhow::anyhow!("Handshake REPLCONF capa psync2 failed"));
+                    }
+                }
+                Err(e) => {
+                    return e.into();
+                }
+            }
+
             stream.write(psync_cmd.as_bytes())?;
             stream.read(&mut [0; 128])?;
         }
