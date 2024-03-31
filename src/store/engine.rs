@@ -167,7 +167,7 @@ impl StoreEngine {
             ]);
             let mut buf = [0; 128];
             stream.write(ping_cmd.as_bytes())?;
-            match stream.read(&buf) {
+            match stream.read(&mut buf) {
                 Ok(buf_len) => {
                     let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
                     if !resp.contains("+PONG") {
@@ -175,12 +175,12 @@ impl StoreEngine {
                     }
                 }
                 Err(e) => {
-                    return e.into();
+                    return Err(anyhow::Error::new(e));
                 }
             }
 
             stream.write(replconf_cmd.as_bytes())?;
-            match stream.read(&buf) {
+            match stream.read(&mut buf) {
                 Ok(buf_len) => {
                     let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
                     if !resp.contains("+OK") {
@@ -188,11 +188,11 @@ impl StoreEngine {
                     }
                 }
                 Err(e) => {
-                    return e.into();
+                    return Err(anyhow::Error::new(e));
                 }
             }
             stream.write(replconf_capa_cmd.as_bytes())?;
-            match stream.read(&buf) {
+            match stream.read(&mut buf) {
                 Ok(buf_len) => {
                     let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
                     if !resp.contains("+OK") {
@@ -200,7 +200,7 @@ impl StoreEngine {
                     }
                 }
                 Err(e) => {
-                    return e.into();
+                    return Err(anyhow::Error::new(e));
                 }
             }
 
