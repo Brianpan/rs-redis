@@ -20,9 +20,14 @@ pub enum ReplicaType {
 pub struct StoreEngine {
     dict: RwLock<HashMap<String, String>>,
     expiring_queue: RwLock<PriorityQueue<String, Reverse<u128>>>,
+    node_info: RwLock<NodeInfo>,
     replica_info: RwLock<ReplicaType>,
     master_info: RwLock<MasterInfo>,
     slave_info: RwLock<SlaveInfo>,
+}
+
+pub struct NodeInfo {
+    port: String,
 }
 
 pub struct MasterInfo {
@@ -43,9 +48,14 @@ impl StoreEngine {
             dict: RwLock::new(HashMap::new()),
             expiring_queue: RwLock::new(PriorityQueue::new()),
             replica_info: RwLock::new(ReplicaType::Master),
+            node_info: RwLock::new(NodeInfo::default()),
             master_info: RwLock::new(MasterInfo::default()),
             slave_info: RwLock::new(SlaveInfo::default()),
         }
+    }
+
+    pub fn set_node_info(&self, port: String) {
+        *self.node_info.write().unwrap() = NodeInfo { port };
     }
 
     pub fn set_replica(&self, host: String) {
@@ -130,7 +140,7 @@ impl StoreEngine {
         if let ReplicaType::Slave(master) = self.get_replica() {
             let mut stream = TcpStream::connect(master)?;
 
-            let redis_port = self.slave_info.read().unwrap().port.clone();
+            let redis_port = self.node_info.read().unwrap().port.clone();
 
             // phase 1: send PING to master
             let ping_cmd = array_to_resp_array(vec!["PING".to_string()]);
@@ -173,6 +183,14 @@ impl StoreEngine {
 impl Default for StoreEngine {
     fn default() -> Self {
         StoreEngine::new()
+    }
+}
+
+impl Default for NodeInfo {
+    fn default() -> Self {
+        NodeInfo {
+            port: "6379".to_string(),
+        }
     }
 }
 

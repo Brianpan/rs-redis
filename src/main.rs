@@ -42,6 +42,8 @@ async fn main() -> std::io::Result<()> {
     let listener = TcpListener::bind(redis_host).await.unwrap();
     let db = Arc::new(StoreEngine::new());
 
+    db.set_node_info(redis_port.clone());
+
     // collect replicaof argument
     if let Some(replica_info) = args.get_many::<String>("replicaof") {
         let values: Vec<&String> = replica_info.collect();
