@@ -13,6 +13,7 @@ const COMMAND_PING: &str = "ping";
 const COMMAND_ECHO: &str = "echo";
 const COMMAND_INFO: &str = "info";
 const COMMAND_REPLCONF: &str = "replconf";
+const COMMAND_PSYNC: &str = "psync";
 
 const RESP_OK: &str = "+OK\r\n";
 const RESP_ERR: &str = "-ERR\r\n";
@@ -98,6 +99,12 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
                         COMMAND_REPLCONF => {
                             let ret = RESP_OK;
                             Ok(ret.to_string())
+                        }
+                        // psync return from master node with fullresync and myid
+                        COMMAND_PSYNC => {
+                            let myid = db.get_master_id();
+                            let ret = format!("+FULLRESYNC {} 0\r\n", myid);
+                            Ok(ret)
                         }
                         _ => Ok(RESP_EMPTY.to_string()),
                     };

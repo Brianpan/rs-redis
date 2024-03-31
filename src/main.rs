@@ -2,10 +2,8 @@ mod engine;
 mod store;
 
 use clap::{Arg, Command};
-use engine::commands::array_to_resp_array;
 use engine::connection::handle_connection;
 use std::sync::Arc;
-use std::time::Duration;
 use store::engine::StoreEngine;
 use tokio::{net::TcpListener, spawn};
 
@@ -39,8 +37,7 @@ async fn main() -> std::io::Result<()> {
 
     let binding = DEFAULT_PORT.to_string();
     let redis_port = args.get_one::<String>("port").unwrap_or(&binding);
-    let redis_host = format!("0.0.0.0:{}", redis_port);
-    let sleep_time = Duration::from_millis(3);
+    let redis_host: String = format!("0.0.0.0:{}", redis_port);
 
     let listener = TcpListener::bind(redis_host).await.unwrap();
     let db = Arc::new(StoreEngine::new());
@@ -50,25 +47,8 @@ async fn main() -> std::io::Result<()> {
         let values: Vec<&String> = replica_info.collect();
         let replica_host = format!("{}:{}", values[0], values[1]);
         db.set_replica(replica_host);
-        // phase 1: send PING to master
-        let ping_cmd = array_to_resp_array(vec!["PING".to_string()]);
-        // let _ = db.send_resp_to_master(ping_cmd);
 
-        // phase 2-1: send REPLCONF listening-port
-        let replconf_cmd = array_to_resp_array(vec![
-            "REPLCONF".to_string(),
-            "listening-port".to_string(),
-            redis_port.clone(),
-        ]);
-        // let _ = db.send_resp_to_master(replconf_cmd);
-
-        // pase 2-2: send REPLCONF capa psync2
-        let replconf_capa_cmd = array_to_resp_array(vec![
-            "REPLCONF".to_string(),
-            "capa".to_string(),
-            "psync2".to_string(),
-        ]);
-        let _ = db.send_resp_to_master(ping_cmd, replconf_cmd, replconf_capa_cmd);
+        let _ = db.handshake_to_master();
     }
 
     // reaper thread

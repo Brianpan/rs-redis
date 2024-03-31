@@ -1,9 +1,10 @@
+use crate::engine::commands::array_to_resp_array;
 use priority_queue::PriorityQueue;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::net::TcpStream;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use std::time::*;
 
 // https://github.com/tokio-rs/tokio/blob/master/examples/tinydb.rs
@@ -32,6 +33,8 @@ pub struct MasterInfo {
 pub struct SlaveInfo {
     host: String,
     port: String,
+    master_replid: String,
+    slave_repl_offset: u64,
 }
 
 impl StoreEngine {
@@ -50,11 +53,17 @@ impl StoreEngine {
         *self.slave_info.write().unwrap() = SlaveInfo {
             host: host.split(":").collect::<Vec<&str>>()[0].to_string(),
             port: host.split(":").collect::<Vec<&str>>()[1].to_string(),
+            master_replid: "?".to_string(),
+            slave_repl_offset: 0,
         }
     }
 
     pub fn get_replica(&self) -> ReplicaType {
         self.replica_info.read().unwrap().clone()
+    }
+
+    pub fn get_master_id(&self) -> String {
+        self.master_info.read().unwrap().master_replid.clone()
     }
 
     pub fn get(&self, key: &str) -> Option<String> {
@@ -117,19 +126,43 @@ impl StoreEngine {
         }
     }
 
-    pub fn send_resp_to_master(
-        &self,
-        resp: String,
-        resp2: String,
-        resp3: String,
-    ) -> anyhow::Result<()> {
+    pub fn handshake_to_master(&self) -> anyhow::Result<()> {
         if let ReplicaType::Slave(master) = self.get_replica() {
             let mut stream = TcpStream::connect(master)?;
-            stream.write(resp.as_bytes())?;
+
+            let redis_port = self.slave_info.read().unwrap().port.clone();
+
+            // phase 1: send PING to master
+            let ping_cmd = array_to_resp_array(vec!["PING".to_string()]);
+
+            // phase 2-1: send REPLCONF listening-port
+            let replconf_cmd = array_to_resp_array(vec![
+                "REPLCONF".to_string(),
+                "listening-port".to_string(),
+                redis_port.clone(),
+            ]);
+
+            // pase 2-2: send REPLCONF capa psync2
+            let replconf_capa_cmd = array_to_resp_array(vec![
+                "REPLCONF".to_string(),
+                "capa".to_string(),
+                "psync2".to_string(),
+            ]);
+
+            // phase 3: send PSYNC
+            let psync_cmd = array_to_resp_array(vec![
+                "PSYNC".to_string(),
+                self.slave_info.read().unwrap().master_replid.clone(),
+                "-1".to_string(),
+            ]);
+
+            stream.write(ping_cmd.as_bytes())?;
             stream.read(&mut [0; 128])?;
-            stream.write(resp2.as_bytes())?;
+            stream.write(replconf_cmd.as_bytes())?;
             stream.read(&mut [0; 128])?;
-            stream.write(resp3.as_bytes())?;
+            stream.write(replconf_capa_cmd.as_bytes())?;
+            stream.read(&mut [0; 128])?;
+            stream.write(psync_cmd.as_bytes())?;
             stream.read(&mut [0; 128])?;
         }
 
@@ -157,6 +190,8 @@ impl Default for SlaveInfo {
         SlaveInfo {
             host: String::new(),
             port: String::new(),
+            master_replid: "?".to_string(),
+            slave_repl_offset: 0,
         }
     }
 }
