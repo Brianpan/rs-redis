@@ -227,7 +227,7 @@ pub fn string_to_bulk_string_for_psync(s: String) -> String {
     let byte_in_string = s
         .as_bytes()
         .iter()
-        .map(|&b| format!("{}", b))
+        .map(|&b| format!("{:08b}", b))
         .collect::<Vec<String>>()
         .join("");
     format!("${}\r\n{}", byte_in_string.len(), byte_in_string)
