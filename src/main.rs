@@ -49,8 +49,10 @@ async fn main() -> std::io::Result<()> {
         let values: Vec<&String> = replica_info.collect();
         let replica_host = format!("{}:{}", values[0], values[1]);
         db.set_replica(replica_host);
-
-        let _ = db.handshake_to_master();
+        let db = db.clone();
+        spawn(async move {
+            let _ = db.handshake_to_master();
+        });
     }
 
     // reaper thread

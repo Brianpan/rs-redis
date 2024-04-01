@@ -201,7 +201,7 @@ fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<V
     Ok(ret_vec)
 }
 
-fn handle_psync(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<String>> {
+fn handle_psync(db: &Arc<StoreEngine>, _cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<String>> {
     let myid = db.get_master_id();
 
     // stage 1: return +FULLRESYNC and myid

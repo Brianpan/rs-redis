@@ -148,7 +148,7 @@ impl StoreEngine {
         }
     }
 
-    pub fn handshake_to_master(&self) -> anyhow::Result<()> {
+    pub async fn handshake_to_master(&self) -> anyhow::Result<()> {
         if let ReplicaType::Slave(master) = self.get_replica() {
             let mut stream = TcpStream::connect(master)?;
 
