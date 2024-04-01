@@ -221,11 +221,12 @@ pub fn string_to_bulk_string(s: String) -> String {
 }
 
 pub fn string_to_bulk_string_for_psync(s: &[u8]) -> String {
-    let byte_in_string = s
-        .iter()
-        .map(|&b| format!("{:08b}", b))
-        .collect::<Vec<String>>()
-        .join("");
+    // let byte_in_string = s
+    //     .iter()
+    //     .map(|&b| format!("{:08b}", b))
+    //     .collect::<Vec<String>>()
+    //     .join("");
+    let byte_in_string = String::from_utf8_lossy(s);
     format!("${}\r\n{}", byte_in_string.len(), byte_in_string)
 }
 
