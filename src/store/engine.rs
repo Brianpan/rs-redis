@@ -245,7 +245,16 @@ impl StoreEngine {
                     return Err(anyhow::Error::new(e));
                 }
             }
-            stream.read(&mut buf)?;
+
+            // read rdb file
+            match stream.read(&mut buf) {
+                Ok(buf_len) => {
+                    let _ = String::from_utf8_lossy(buf[..buf_len].as_ref());
+                }
+                Err(e) => {
+                    return Err(anyhow::Error::new(e));
+                }
+            }
         }
 
         Ok(())
