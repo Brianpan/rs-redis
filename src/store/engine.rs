@@ -240,6 +240,7 @@ impl StoreEngine {
                             break;
                         }
                     }
+                    println!("debug");
                 }
                 Err(e) => {
                     return Err(anyhow::Error::new(e));
