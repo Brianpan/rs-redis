@@ -207,8 +207,6 @@ impl StoreEngine {
             }
 
             stream.write(psync_cmd.as_bytes())?;
-            stream.read(&mut buf)?;
-
             match stream.read(&mut buf) {
                 Ok(buf_len) => {
                     let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
@@ -236,6 +234,7 @@ impl StoreEngine {
                     return Err(anyhow::Error::new(e));
                 }
             }
+            stream.read(&mut buf)?;
         }
 
         Ok(())
