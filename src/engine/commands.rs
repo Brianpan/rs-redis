@@ -229,7 +229,7 @@ pub fn string_to_bulk_string_for_psync(s: &[u8]) -> String {
     //     .iter()
     //     .map(|&b| format!("{}", b))
     //     .collect::<String>();
-    let byte_in_string = s.iter().map(|&b| format!("{:02x}", b)).collect::<String>();
+    let byte_in_string = s.iter().map(|&b| format!("{:08b}", b)).collect::<String>();
     format!("${}\r\n{}", s.to_vec().len(), byte_in_string)
 }
 
