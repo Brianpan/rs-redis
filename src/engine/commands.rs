@@ -210,13 +210,17 @@ fn handle_psync(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<
     ret_vec.push(ret);
 
     // stage 2: return the RDB file
-    ret_vec.push(string_to_bulk_string(EMPTY_RDB.to_string()));
+    ret_vec.push(string_to_bulk_string_for_psync(EMPTY_RDB.to_string()));
 
     Ok(ret_vec)
 }
 
 pub fn string_to_bulk_string(s: String) -> String {
     format!("${}\r\n{}\r\n", s.len(), s)
+}
+
+pub fn string_to_bulk_string_for_psync(s: String) -> String {
+    format!("${}\r\n{}", s.len(), s)
 }
 
 pub fn array_to_resp_array(vec: Vec<String>) -> String {
