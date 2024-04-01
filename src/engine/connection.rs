@@ -71,7 +71,7 @@ pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream) {
                                                             .write_all(resp.as_bytes())
                                                             .await
                                                             .unwrap();
-                                                        tokio::time::sleep(sleep_time).await;
+                                                        // tokio::time::sleep(sleep_time).await;
                                                     }
 
                                                     // stream
@@ -86,7 +86,7 @@ pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream) {
                                     } else if let Ok(resps) = command_handler(db, resp) {
                                         for resp in resps {
                                             stream.write_all(resp.as_bytes()).await.unwrap();
-                                            tokio::time::sleep(sleep_time).await;
+                                            // tokio::time::sleep(sleep_time).await;
                                         }
                                         // stream.write_all(resps.concat().as_bytes()).await.unwrap();
                                     }
