@@ -24,11 +24,27 @@ const RESP_EMPTY: &str = "*0\r\n";
 // it will be changed to a random value in the future
 const MYID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 
-pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
+const EMPTY_RDB: &str = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
+
+// we support multiple responses to handle commands like psync
+pub fn command_handler(
+    db: &Arc<StoreEngine>,
+    cmd: Arc<RwLock<RespMessage>>,
+) -> Result<Vec<String>> {
+    let mut resp_vec = Vec::new();
     let ret = match cmd.read().unwrap().resp_type {
-        RespType::SimpleString => Ok(RESP_OK.to_string()),
-        RespType::Error => Ok(RESP_ERR.to_string()),
-        RespType::Integer => Ok(format!(":{}\r\n", cmd.read().unwrap().int_data)),
+        RespType::SimpleString => {
+            resp_vec.push(RESP_OK.to_string());
+            Ok(resp_vec)
+        }
+        RespType::Error => {
+            resp_vec.push(RESP_ERR.to_string());
+            Ok(resp_vec)
+        }
+        RespType::Integer => {
+            resp_vec.push(format!(":{}\r\n", cmd.read().unwrap().int_data));
+            Ok(resp_vec)
+        }
         RespType::BulkString => {
             match cmd
                 .read()
@@ -38,8 +54,11 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
                 .to_lowercase()
                 .as_str()
             {
-                "ping" => Ok(RESP_PONG.to_string()),
-                _ => Err(anyhow::anyhow!("Unknown command")),
+                "ping" => {
+                    resp_vec.push(RESP_PONG.to_string());
+                    Ok(resp_vec)
+                }
+                _ => return Err(anyhow::anyhow!("Unknown command")),
             }
         }
         RespType::Array => {
@@ -51,13 +70,21 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
                         .to_lowercase()
                         .as_str()
                     {
-                        "" => Ok(RESP_OK.to_string()),
+                        "" => {
+                            resp_vec.push(RESP_OK.to_string());
+                            Ok(resp_vec)
+                        }
                         COMMAND_GET => {
                             let key = cmd.read().unwrap().vec_data[1].str_data.clone();
                             match db.get(&key) {
-                                Some(val) => Ok(string_to_bulk_string(val)),
-                                None => Ok("$-1\r\n".to_string()),
+                                Some(val) => {
+                                    resp_vec.push(string_to_bulk_string(val));
+                                }
+                                None => {
+                                    resp_vec.push("$-1\r\n".to_string());
+                                }
                             }
+                            Ok(resp_vec)
                         }
                         COMMAND_SET => {
                             let db = db.clone();
@@ -65,7 +92,7 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
 
                             // no value included
                             if cmd.read().unwrap().vec_data.len() < 3 {
-                                return Ok(RESP_ERR.to_string());
+                                resp_vec.push(RESP_ERR.to_string());
                             }
 
                             let val = cmd.read().unwrap().vec_data[2].str_data.clone();
@@ -82,9 +109,13 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
                                 db.set(key, val);
                             }
 
-                            Ok(RESP_OK.to_string())
+                            resp_vec.push(RESP_OK.to_string());
+                            Ok(resp_vec)
                         }
-                        COMMAND_PING => Ok(RESP_PONG.to_string()),
+                        COMMAND_PING => {
+                            resp_vec.push(RESP_PONG.to_string());
+                            Ok(resp_vec)
+                        }
                         COMMAND_ECHO => {
                             let mut ret = String::new();
                             for i in 1..cmd.read().unwrap().vec_data.len() {
@@ -92,39 +123,45 @@ pub fn command_handler(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> 
                                     cmd.read().unwrap().vec_data[i].str_data.clone(),
                                 ));
                             }
-                            Ok(ret)
+                            resp_vec.push(ret);
+                            Ok(resp_vec)
                         }
                         COMMAND_INFO => handle_info(&db.clone(), cmd.clone()),
                         // replconf always return OK
                         COMMAND_REPLCONF => {
                             let ret = RESP_OK;
-                            Ok(ret.to_string())
+                            resp_vec.push(ret.to_string());
+                            Ok(resp_vec)
                         }
                         // psync return from master node with fullresync and myid
-                        COMMAND_PSYNC => {
-                            let myid = db.get_master_id();
-                            let ret = format!("+FULLRESYNC {} 0\r\n", myid);
-                            Ok(ret)
+                        COMMAND_PSYNC => handle_psync(&db.clone(), cmd.clone()),
+                        _ => {
+                            resp_vec.push(RESP_EMPTY.to_string());
+                            Ok(resp_vec)
                         }
-                        _ => Ok(RESP_EMPTY.to_string()),
                     };
                 }
-                _ => return Ok(RESP_EMPTY.to_string()),
+                _ => {
+                    resp_vec.push(RESP_EMPTY.to_string());
+                    Ok(resp_vec)
+                }
             }
         }
-        _ => Err(anyhow::anyhow!("Unknown command")),
+        _ => return Err(anyhow::anyhow!("Unknown command")),
     };
 
     ret
 }
 
-fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<String> {
+fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<String>> {
     let mut lookup_keys: Vec<String> = Vec::new();
     for i in 1..cmd.read().unwrap().vec_data.len() {
         lookup_keys.push(cmd.read().unwrap().vec_data[i as usize].str_data.clone());
     }
 
+    let mut ret_vec = Vec::new();
     let mut ret = String::new();
+
     if lookup_keys.is_empty() {
         let db_info = "db_size: 0".to_string();
         ret.push_str(&string_to_bulk_string(db_info));
@@ -160,7 +197,22 @@ fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<S
         }
     }
 
-    Ok(ret)
+    ret_vec.push(ret);
+    Ok(ret_vec)
+}
+
+fn handle_psync(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<String>> {
+    let myid = db.get_master_id();
+
+    // stage 1: return +FULLRESYNC and myid
+    let ret = format!("+FULLRESYNC {} 0\r\n", myid);
+    let mut ret_vec = Vec::new();
+    ret_vec.push(ret);
+
+    // stage 2: return the RDB file
+    ret_vec.push(string_to_bulk_string(EMPTY_RDB.to_string()));
+
+    Ok(ret_vec)
 }
 
 pub fn string_to_bulk_string(s: String) -> String {

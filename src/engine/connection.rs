@@ -63,18 +63,22 @@ pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream) {
                                             parent.write().unwrap().state = RespParsingState::End;
                                             if cmd_stack.is_empty() {
                                                 let resp = command_handler(db, parent.clone());
-                                                if let Ok(resp) = resp {
-                                                    stream
-                                                        .write_all(resp.as_bytes())
-                                                        .await
-                                                        .unwrap();
+                                                if let Ok(resps) = resp {
+                                                    for resp in resps {
+                                                        stream
+                                                            .write_all(resp.as_bytes())
+                                                            .await
+                                                            .unwrap();
+                                                    }
                                                 }
                                             }
                                         } else {
                                             cmd_stack.push_back(parent);
                                         }
-                                    } else if let Ok(resp) = command_handler(db, resp) {
-                                        stream.write_all(resp.as_bytes()).await.unwrap();
+                                    } else if let Ok(resps) = command_handler(db, resp) {
+                                        for resp in resps {
+                                            stream.write_all(resp.as_bytes()).await.unwrap();
+                                        }
                                     }
 
                                     // next cmd is a new RespMessage
