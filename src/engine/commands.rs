@@ -31,19 +31,23 @@ const EMPTY_RDB: &str = "524544495330303131fa0972656469732d76657205372e322e30fa0
 pub fn command_handler(
     db: &Arc<StoreEngine>,
     cmd: Arc<RwLock<RespMessage>>,
-) -> Result<Vec<String>> {
+) -> Result<Vec<Vec<u8>>> {
     let mut resp_vec = Vec::new();
     let ret = match cmd.read().unwrap().resp_type {
         RespType::SimpleString => {
-            resp_vec.push(RESP_OK.to_string());
+            resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());
             Ok(resp_vec)
         }
         RespType::Error => {
-            resp_vec.push(RESP_ERR.to_string());
+            resp_vec.push(RESP_ERR.to_string().as_bytes().to_vec());
             Ok(resp_vec)
         }
         RespType::Integer => {
-            resp_vec.push(format!(":{}\r\n", cmd.read().unwrap().int_data));
+            resp_vec.push(
+                format!(":{}\r\n", cmd.read().unwrap().int_data)
+                    .as_bytes()
+                    .to_vec(),
+            );
             Ok(resp_vec)
         }
         RespType::BulkString => {
@@ -56,7 +60,7 @@ pub fn command_handler(
                 .as_str()
             {
                 "ping" => {
-                    resp_vec.push(RESP_PONG.to_string());
+                    resp_vec.push(RESP_PONG.to_string().as_bytes().to_vec());
                     Ok(resp_vec)
                 }
                 _ => return Err(anyhow::anyhow!("Unknown command")),
@@ -72,17 +76,17 @@ pub fn command_handler(
                         .as_str()
                     {
                         "" => {
-                            resp_vec.push(RESP_OK.to_string());
+                            resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());
                             Ok(resp_vec)
                         }
                         COMMAND_GET => {
                             let key = cmd.read().unwrap().vec_data[1].str_data.clone();
                             match db.get(&key) {
                                 Some(val) => {
-                                    resp_vec.push(string_to_bulk_string(val));
+                                    resp_vec.push(string_to_bulk_string(val).as_bytes().to_vec());
                                 }
                                 None => {
-                                    resp_vec.push("$-1\r\n".to_string());
+                                    resp_vec.push("$-1\r\n".to_string().as_bytes().to_vec());
                                 }
                             }
                             Ok(resp_vec)
@@ -93,7 +97,7 @@ pub fn command_handler(
 
                             // no value included
                             if cmd.read().unwrap().vec_data.len() < 3 {
-                                resp_vec.push(RESP_ERR.to_string());
+                                resp_vec.push(RESP_ERR.to_string().as_bytes().to_vec());
                             }
 
                             let val = cmd.read().unwrap().vec_data[2].str_data.clone();
@@ -110,11 +114,11 @@ pub fn command_handler(
                                 db.set(key, val);
                             }
 
-                            resp_vec.push(RESP_OK.to_string());
+                            resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());
                             Ok(resp_vec)
                         }
                         COMMAND_PING => {
-                            resp_vec.push(RESP_PONG.to_string());
+                            resp_vec.push(RESP_PONG.to_string().as_bytes().to_vec());
                             Ok(resp_vec)
                         }
                         COMMAND_ECHO => {
@@ -124,26 +128,26 @@ pub fn command_handler(
                                     cmd.read().unwrap().vec_data[i].str_data.clone(),
                                 ));
                             }
-                            resp_vec.push(ret);
+                            resp_vec.push(ret.as_bytes().to_vec());
                             Ok(resp_vec)
                         }
                         COMMAND_INFO => handle_info(&db.clone(), cmd.clone()),
                         // replconf always return OK
                         COMMAND_REPLCONF => {
                             let ret = RESP_OK;
-                            resp_vec.push(ret.to_string());
+                            resp_vec.push(ret.to_string().as_bytes().to_vec());
                             Ok(resp_vec)
                         }
                         // psync return from master node with fullresync and myid
                         COMMAND_PSYNC => handle_psync(&db.clone(), cmd.clone()),
                         _ => {
-                            resp_vec.push(RESP_EMPTY.to_string());
+                            resp_vec.push(RESP_EMPTY.to_string().as_bytes().to_vec());
                             Ok(resp_vec)
                         }
                     };
                 }
                 _ => {
-                    resp_vec.push(RESP_EMPTY.to_string());
+                    resp_vec.push(RESP_EMPTY.to_string().as_bytes().to_vec());
                     Ok(resp_vec)
                 }
             }
@@ -154,7 +158,7 @@ pub fn command_handler(
     ret
 }
 
-fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<String>> {
+fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<Vec<u8>>> {
     let mut lookup_keys: Vec<String> = Vec::new();
     for i in 1..cmd.read().unwrap().vec_data.len() {
         lookup_keys.push(cmd.read().unwrap().vec_data[i as usize].str_data.clone());
@@ -198,19 +202,22 @@ fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<V
         }
     }
 
-    ret_vec.push(ret);
+    ret_vec.push(ret.as_bytes().to_vec());
     Ok(ret_vec)
 }
 
-fn handle_psync(db: &Arc<StoreEngine>, _cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<String>> {
+fn handle_psync(db: &Arc<StoreEngine>, _cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<Vec<u8>>> {
     let myid = db.get_master_id();
 
     // stage 1: return +FULLRESYNC and myid
     let ret = format!("+FULLRESYNC {} 0\r\n", myid);
     let mut ret_vec = Vec::new();
-    ret_vec.push(ret);
+    ret_vec.push(ret.as_bytes().to_vec());
+    let rdb_snapshot = hex::decode(EMPTY_RDB).unwrap();
+    let mut rdb_vec: Vec<u8> = string_to_bulk_string_for_psync(EMPTY_RDB.to_string()).into();
+    rdb_vec.extend(&rdb_snapshot);
 
-    ret_vec.push(string_to_bulk_string_for_psync(EMPTY_RDB.to_string()));
+    ret_vec.push(rdb_vec);
     Ok(ret_vec)
 }
 
@@ -230,14 +237,7 @@ pub fn string_to_bulk_string_for_psync(s: String) -> String {
     //     .map(|&b| format!("{}", b))
     //     .collect::<String>();
     let rdb_decode = hex::decode(s).unwrap();
-    format!(
-        "${}\r\n{}",
-        rdb_decode.len(),
-        rdb_decode
-            .iter()
-            .map(|&b| format!("{:02x}", b))
-            .collect::<String>()
-    )
+    format!("${}\r\n", rdb_decode.len())
 }
 
 pub fn array_to_resp_array(vec: Vec<String>) -> String {
