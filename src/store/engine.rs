@@ -11,6 +11,8 @@ use std::time::*;
 
 const MYID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 
+const FULLRESYNC: &str = "+FULLRESYNC";
+
 #[derive(Clone)]
 pub enum ReplicaType {
     Master,
@@ -205,7 +207,35 @@ impl StoreEngine {
             }
 
             stream.write(psync_cmd.as_bytes())?;
-            stream.read(&mut [0; 128])?;
+            stream.read(&mut buf)?;
+
+            match stream.read(&mut buf) {
+                Ok(buf_len) => {
+                    let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
+                    if !resp.contains(FULLRESYNC) {
+                        return Err(anyhow::anyhow!("Handshake PSYNC failed"));
+                    }
+                    // parse the master id
+                    // handmade parsing this time,
+                    // will use nom parser to write RESP protocol parser in the future
+                    // +FULLRESYNC <REPL_ID> 0\r\n
+                    // simple string format so it's easier for us to parse
+                    let mut next_is_masterid = false;
+                    while let Some(word) = resp.split_whitespace().next() {
+                        if word == FULLRESYNC {
+                            next_is_masterid = true;
+                            continue;
+                        } else if next_is_masterid {
+                            (*self.slave_info.write().unwrap()).master_replid =
+                                word.to_string().clone();
+                            break;
+                        }
+                    }
+                }
+                Err(e) => {
+                    return Err(anyhow::Error::new(e));
+                }
+            }
         }
 
         Ok(())
