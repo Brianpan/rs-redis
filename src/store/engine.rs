@@ -246,7 +246,7 @@ impl StoreEngine {
                     return Err(anyhow::Error::new(e));
                 }
             }
-            stream.read(&mut buf)?;
+            // stream.read(&mut buf)?;
 
             // read rdb file
             // match stream.read(&mut buf) {
