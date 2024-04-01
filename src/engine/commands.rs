@@ -212,6 +212,10 @@ fn handle_psync(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<
     // stage 2: return the RDB file
     ret_vec.push(string_to_bulk_string_for_psync(EMPTY_RDB.to_string()));
 
+    println!(
+        "rdb: {}",
+        string_to_bulk_string_for_psync(EMPTY_RDB.to_string())
+    );
     Ok(ret_vec)
 }
 
