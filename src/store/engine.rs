@@ -13,6 +13,13 @@ const MYID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 
 const FULLRESYNC: &str = "+FULLRESYNC";
 
+enum HandshakeState {
+    Ping,
+    Replconf,
+    ReplconfCapa,
+    Psync,
+}
+
 #[derive(Clone)]
 pub enum ReplicaType {
     Master,
@@ -35,6 +42,7 @@ pub struct NodeInfo {
 pub struct MasterInfo {
     master_replid: String,
     master_repl_offset: u64,
+    handshake_state: HandshakeState,
 }
 
 pub struct SlaveInfo {
@@ -42,6 +50,7 @@ pub struct SlaveInfo {
     port: String,
     master_replid: String,
     slave_repl_offset: u64,
+    handshake_state: HandshakeState,
 }
 
 impl StoreEngine {
@@ -67,6 +76,7 @@ impl StoreEngine {
             port: host.split(":").collect::<Vec<&str>>()[1].to_string(),
             master_replid: "?".to_string(),
             slave_repl_offset: 0,
+            handshake_state: HandshakeState::Ping,
         }
     }
 
@@ -226,6 +236,7 @@ impl StoreEngine {
                         } else if next_is_masterid {
                             (*self.slave_info.write().unwrap()).master_replid =
                                 word.to_string().clone();
+
                             break;
                         }
                     }
@@ -260,6 +271,7 @@ impl Default for MasterInfo {
         MasterInfo {
             master_replid: MYID.to_string(),
             master_repl_offset: 0,
+            handshake_state: HandshakeState::Ping,
         }
     }
 }
@@ -271,6 +283,7 @@ impl Default for SlaveInfo {
             port: String::new(),
             master_replid: "?".to_string(),
             slave_repl_offset: 0,
+            handshake_state: HandshakeState::Ping,
         }
     }
 }

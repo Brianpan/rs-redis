@@ -8,6 +8,7 @@ use super::{RespMessage, RespParsingState, RespType};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tokio::time::Duration;
 
 pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream) {
     let mut cmd = String::new();
@@ -45,6 +46,7 @@ pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream) {
                                 // main function to parse the command
                                 // the result is in RespMessage
                                 resp.write().unwrap().parse(&cmd);
+                                let sleep_time = Duration::from_millis(3);
 
                                 if resp.read().unwrap().state == RespParsingState::End {
                                     // if the parent is an array, we need to check if it's done
@@ -70,6 +72,7 @@ pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream) {
                                                             .await
                                                             .unwrap();
                                                     }
+                                                    tokio::time::sleep(sleep_time).await;
                                                     // stream
                                                     //     .write_all(resps.concat().as_bytes())
                                                     //     .await
@@ -82,6 +85,7 @@ pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream) {
                                     } else if let Ok(resps) = command_handler(db, resp) {
                                         for resp in resps {
                                             stream.write_all(resp.as_bytes()).await.unwrap();
+                                            tokio::time::sleep(sleep_time).await;
                                         }
                                         // stream.write_all(resps.concat().as_bytes()).await.unwrap();
                                     }
