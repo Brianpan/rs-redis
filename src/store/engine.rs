@@ -177,7 +177,7 @@ impl StoreEngine {
                 self.slave_info.read().unwrap().master_replid.clone(),
                 "-1".to_string(),
             ]);
-            let mut buf = [0; 128];
+            let mut buf = [0; 1024];
             stream.write(ping_cmd.as_bytes())?;
             match stream.read(&mut buf) {
                 Ok(buf_len) => {
@@ -245,6 +245,7 @@ impl StoreEngine {
                     return Err(anyhow::Error::new(e));
                 }
             }
+            stream.read(&mut buf)?;
 
             // read rdb file
             // match stream.read(&mut buf) {
