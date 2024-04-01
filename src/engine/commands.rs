@@ -5,7 +5,7 @@ use crate::store::engine::{ReplicaType, StoreEngine};
 use super::{RespMessage, RespType};
 
 use anyhow::Result;
-use hex_literal::hex;
+use hex;
 
 // command consts
 const COMMAND_GET: &str = "get";
@@ -25,7 +25,7 @@ const RESP_EMPTY: &str = "*0\r\n";
 // it will be changed to a random value in the future
 const MYID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 
-const EMPTY_RDB: [u8;88] = hex!("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2");
+const EMPTY_RDB: &str = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
 
 // we support multiple responses to handle commands like psync
 pub fn command_handler(
@@ -210,7 +210,7 @@ fn handle_psync(db: &Arc<StoreEngine>, _cmd: Arc<RwLock<RespMessage>>) -> Result
     let mut ret_vec = Vec::new();
     ret_vec.push(ret);
 
-    ret_vec.push(string_to_bulk_string_for_psync(&EMPTY_RDB));
+    ret_vec.push(string_to_bulk_string_for_psync(EMPTY_RDB.to_string()));
     Ok(ret_vec)
 }
 
@@ -218,7 +218,7 @@ pub fn string_to_bulk_string(s: String) -> String {
     format!("${}\r\n{}\r\n", s.len(), s)
 }
 
-pub fn string_to_bulk_string_for_psync(s: &[u8]) -> String {
+pub fn string_to_bulk_string_for_psync(s: String) -> String {
     // let byte_in_string = s
     //     .iter()
     //     .map(|&b| format!("{:08b}", b))
@@ -229,8 +229,15 @@ pub fn string_to_bulk_string_for_psync(s: &[u8]) -> String {
     //     .iter()
     //     .map(|&b| format!("{}", b))
     //     .collect::<String>();
-    let byte_in_string = s.iter().map(|&b| format!("{:08b}", b)).collect::<String>();
-    format!("${}\r\n{}", s.to_vec().len(), byte_in_string)
+    let rdb_decode = hex::decode(s).unwrap();
+    format!(
+        "${}\r\n{}",
+        rdb_decode.len(),
+        rdb_decode
+            .iter()
+            .map(|&b| format!("{:02x}", b))
+            .collect::<String>()
+    )
 }
 
 pub fn array_to_resp_array(vec: Vec<String>) -> String {
