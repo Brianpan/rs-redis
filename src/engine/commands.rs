@@ -224,12 +224,13 @@ pub fn string_to_bulk_string_for_psync(s: &[u8]) -> String {
     //     .map(|&b| format!("{:08b}", b))
     //     .collect::<Vec<String>>()
     //     .join("");
-    let byte_in_string = s
-        .to_vec()
-        .iter()
-        .map(|&b| format!("{:08b}", b))
-        .collect::<String>();
-    format!("${}\r\n{}", byte_in_string.len(), byte_in_string)
+    // let byte_in_string = s
+    //     .to_vec()
+    //     .iter()
+    //     .map(|&b| format!("{}", b))
+    //     .collect::<String>();
+    let byte_in_string = s.iter().map(|&b| format!("{:02x}", b)).collect::<String>();
+    format!("${}\r\n{}", s.to_vec().len(), byte_in_string)
 }
 
 pub fn array_to_resp_array(vec: Vec<String>) -> String {
