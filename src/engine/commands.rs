@@ -1,8 +1,10 @@
 use std::sync::{Arc, RwLock};
 
-use crate::store::engine::{HandshakeState, MasterEngine, ReplicaType, StoreEngine};
-
 use super::{RespMessage, RespType};
+
+use crate::store::engine::StoreEngine;
+use crate::store::master_engine::MasterEngine;
+use crate::store::{HandshakeState, ReplicaType};
 
 use anyhow::Result;
 use hex;
