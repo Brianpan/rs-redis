@@ -13,44 +13,62 @@ const MYID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 
 const FULLRESYNC: &str = "+FULLRESYNC";
 
-enum HandshakeState {
+#[derive(Clone)]
+pub enum HandshakeState {
     Ping,
     Replconf,
     ReplconfCapa,
     Psync,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ReplicaType {
     Master,
     Slave(String),
 }
+
+pub type HostPort = (String, String);
 
 pub struct StoreEngine {
     dict: RwLock<HashMap<String, String>>,
     expiring_queue: RwLock<PriorityQueue<String, Reverse<u128>>>,
     node_info: RwLock<NodeInfo>,
     replica_info: RwLock<ReplicaType>,
-    master_info: RwLock<MasterInfo>,
-    slave_info: RwLock<SlaveInfo>,
+    pub master_info: RwLock<MasterInfo>,
+    pub slave_info: RwLock<SlaveInfo>,
 }
 
 pub struct NodeInfo {
     port: String,
 }
 
+pub trait MasterEngine {
+    fn get_master_id(&self) -> String {
+        return String::new();
+    }
+    fn is_master(&self) -> bool {
+        return false;
+    }
+    fn set_slave_node(&self, _host: String, _port: String, _handshake_state: HandshakeState) {}
+    fn get_slave_node(&self, _host: String, _port: String) -> Option<SlaveInfo> {
+        return None;
+    }
+}
+
 pub struct MasterInfo {
     master_replid: String,
     master_repl_offset: u64,
-    handshake_state: HandshakeState,
+    pub handshake_state: HandshakeState,
+    slave_list: HashMap<HostPort, SlaveInfo>,
 }
 
+#[derive(Clone)]
 pub struct SlaveInfo {
     host: String,
-    port: String,
+    pub port: String,
     master_replid: String,
     slave_repl_offset: u64,
-    handshake_state: HandshakeState,
+    pub handshake_state: HandshakeState,
 }
 
 impl StoreEngine {
@@ -263,6 +281,58 @@ impl StoreEngine {
     }
 }
 
+impl MasterEngine for StoreEngine {
+    fn get_master_id(&self) -> String {
+        self.master_info.read().unwrap().master_replid.clone()
+    }
+
+    fn is_master(&self) -> bool {
+        self.replica_info.read().unwrap().clone() == ReplicaType::Master
+    }
+
+    fn set_slave_node(&self, host: String, port: String, handshake_state: HandshakeState) {
+        let host_port = (host.clone(), port.clone());
+
+        match self.master_info.read().unwrap().slave_list.get(&host_port) {
+            Some(slave) => {
+                let mut slave = slave.clone();
+                slave.handshake_state = handshake_state;
+                slave.slave_repl_offset = 0;
+                slave.master_replid = self.get_master_id();
+                self.master_info
+                    .write()
+                    .unwrap()
+                    .slave_list
+                    .insert(host_port, slave);
+            }
+            None => {
+                let slave = SlaveInfo {
+                    host,
+                    port,
+                    master_replid: self.get_master_id(),
+                    slave_repl_offset: 0,
+                    handshake_state,
+                };
+                self.master_info
+                    .write()
+                    .unwrap()
+                    .slave_list
+                    .insert(host_port, slave);
+            }
+        }
+    }
+
+    fn get_slave_node(&self, host: String, port: String) -> Option<SlaveInfo> {
+        let host_port = (host, port);
+        self.master_info
+            .read()
+            .unwrap()
+            .slave_list
+            .get(&host_port)
+            .cloned()
+    }
+}
+
 impl Default for StoreEngine {
     fn default() -> Self {
         StoreEngine::new()
@@ -283,6 +353,7 @@ impl Default for MasterInfo {
             master_replid: MYID.to_string(),
             master_repl_offset: 0,
             handshake_state: HandshakeState::Ping,
+            slave_list: HashMap::new(),
         }
     }
 }

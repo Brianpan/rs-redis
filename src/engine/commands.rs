@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use crate::store::engine::{ReplicaType, StoreEngine};
+use crate::store::engine::{HandshakeState, MasterEngine, ReplicaType, StoreEngine};
 
 use super::{RespMessage, RespType};
 
@@ -134,6 +134,21 @@ pub fn command_handler(
                         COMMAND_INFO => handle_info(&db.clone(), cmd.clone()),
                         // replconf always return OK
                         COMMAND_REPLCONF => {
+                            if cmd.read().unwrap().vec_data.len() > 2 {
+                                match cmd.read().unwrap().vec_data[1].str_data.as_str() {
+                                    "listening-port" => {
+                                        let port = cmd.read().unwrap().vec_data[2].str_data.clone();
+                                        let remote_addr = cmd.read().unwrap().remote_addr.clone();
+                                        db.set_slave_node(
+                                            remote_addr,
+                                            port,
+                                            HandshakeState::Replconf,
+                                        );
+                                    }
+                                    "capa" => {}
+                                    _ => {}
+                                }
+                            }
                             let ret = RESP_OK;
                             resp_vec.push(ret.to_string().as_bytes().to_vec());
                             Ok(resp_vec)
@@ -226,16 +241,6 @@ pub fn string_to_bulk_string(s: String) -> String {
 }
 
 pub fn string_to_bulk_string_for_psync(s: String) -> String {
-    // let byte_in_string = s
-    //     .iter()
-    //     .map(|&b| format!("{:08b}", b))
-    //     .collect::<Vec<String>>()
-    //     .join("");
-    // let byte_in_string = s
-    //     .to_vec()
-    //     .iter()
-    //     .map(|&b| format!("{}", b))
-    //     .collect::<String>();
     let rdb_decode = hex::decode(s).unwrap();
     format!("${}\r\n", rdb_decode.len())
 }

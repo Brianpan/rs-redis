@@ -64,9 +64,10 @@ async fn main() -> std::io::Result<()> {
 
     loop {
         let cdb = db.clone();
-        let (socket, _) = listener.accept().await.unwrap();
+        let (socket, addr) = listener.accept().await.unwrap();
+
         tokio::spawn(async move {
-            handle_connection(&cdb, socket).await;
+            handle_connection(&cdb, socket, addr).await;
         });
     }
 }

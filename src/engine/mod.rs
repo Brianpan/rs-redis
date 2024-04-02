@@ -19,6 +19,7 @@ pub enum RespType {
 }
 #[derive(PartialEq, Clone)]
 pub struct RespMessage {
+    pub remote_addr: String,
     resp_type: RespType,
     state: RespParsingState,
     int_data: i64,
@@ -27,8 +28,9 @@ pub struct RespMessage {
 }
 
 impl RespMessage {
-    pub fn new() -> Self {
+    pub fn new(addr: String) -> Self {
         RespMessage {
+            remote_addr: addr,
             resp_type: RespType::Unknown,
             state: RespParsingState::ParsingMeta,
             int_data: 0,
