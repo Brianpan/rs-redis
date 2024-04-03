@@ -62,12 +62,19 @@ async fn main() -> std::io::Result<()> {
         reaper_db.expired_reaper().await;
     });
 
-    loop {
-        let cdb = db.clone();
-        let (socket, addr) = listener.accept().await.unwrap();
+    // loop {
+    //     let cdb = db.clone();
+    //     let (socket, addr) = listener.accept().await.unwrap();
 
-        tokio::spawn(async move {
-            handle_connection(&cdb, socket, addr).await;
-        });
+    //     tokio::spawn(async move {
+    //         handle_connection(&cdb, socket, addr).await;
+    //     });
+    // }
+
+    while let Ok((socket, addr)) = listener.accept().await {
+        let cdb = db.clone();
+        tokio::spawn(async move { handle_connection(&cdb, socket, addr).await });
     }
+
+    Ok(())
 }
