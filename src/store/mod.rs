@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 const MYID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum HandshakeState {
     Ping,
     Replconf,

@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::sync::{Arc, RwLock};
 
 use super::{RespMessage, RespType};
@@ -104,6 +105,7 @@ pub fn command_handler(
 
                             let val = cmd.read().unwrap().vec_data[2].str_data.clone();
                             let cmd_len = cmd.read().unwrap().vec_data.len();
+
                             if cmd_len == 5
                                 && cmd.read().unwrap().vec_data[3].str_data.to_lowercase() == "px"
                             {
@@ -135,26 +137,7 @@ pub fn command_handler(
                         }
                         COMMAND_INFO => handle_info(&db.clone(), cmd.clone()),
                         // replconf always return OK
-                        COMMAND_REPLCONF => {
-                            if cmd.read().unwrap().vec_data.len() > 2 {
-                                match cmd.read().unwrap().vec_data[1].str_data.as_str() {
-                                    "listening-port" => {
-                                        let port = cmd.read().unwrap().vec_data[2].str_data.clone();
-                                        let remote_addr = cmd.read().unwrap().remote_addr.clone();
-                                        db.set_slave_node(
-                                            remote_addr,
-                                            port,
-                                            HandshakeState::Replconf,
-                                        );
-                                    }
-                                    "capa" => {}
-                                    _ => {}
-                                }
-                            }
-                            let ret = RESP_OK;
-                            resp_vec.push(ret.to_string().as_bytes().to_vec());
-                            Ok(resp_vec)
-                        }
+                        COMMAND_REPLCONF => handle_replica(&db.clone(), cmd.clone()),
                         // psync return from master node with fullresync and myid
                         COMMAND_PSYNC => handle_psync(&db.clone(), cmd.clone()),
                         _ => {
@@ -236,6 +219,40 @@ fn handle_psync(db: &Arc<StoreEngine>, _cmd: Arc<RwLock<RespMessage>>) -> Result
 
     ret_vec.push(rdb_vec);
     Ok(ret_vec)
+}
+
+fn handle_replica(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<Vec<u8>>> {
+    let mut resp_vec = Vec::new();
+
+    if cmd.read().unwrap().vec_data.len() > 2 {
+        let port = cmd.read().unwrap().vec_data[2].str_data.clone();
+        let remote_addr = cmd.read().unwrap().remote_addr.clone();
+
+        match cmd.read().unwrap().vec_data[1]
+            .str_data
+            .to_lowercase()
+            .as_str()
+        {
+            "listening-port" => {
+                db.set_replica_as_master();
+                db.set_slave_node(remote_addr, port, HandshakeState::Replconf);
+            }
+            "capa" => db.set_slave_node(remote_addr, port, HandshakeState::ReplconfCapa),
+            "psync" => {
+                if cmd.read().unwrap().vec_data.len() > 3 {
+                    let myid = cmd.read().unwrap().vec_data[2].str_data.clone();
+                    let offset = cmd.read().unwrap().vec_data[3].str_data.clone();
+                    if myid == "?" && offset == "-1" {
+                        db.set_slave_node(remote_addr, port, HandshakeState::Psync);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    let ret = RESP_OK;
+    resp_vec.push(ret.to_string().as_bytes().to_vec());
+    Ok(resp_vec)
 }
 
 pub fn string_to_bulk_string(s: String) -> String {

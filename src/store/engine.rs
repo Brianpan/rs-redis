@@ -48,6 +48,10 @@ impl StoreEngine {
         }
     }
 
+    pub fn set_replica_as_master(&self) {
+        *self.replica_info.write().unwrap() = ReplicaType::Master;
+    }
+
     pub fn get_replica(&self) -> ReplicaType {
         self.replica_info.read().unwrap().clone()
     }

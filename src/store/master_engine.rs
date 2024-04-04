@@ -1,5 +1,8 @@
 use super::engine::StoreEngine;
 use super::{HandshakeState, HostPort, ReplicaType, SlaveInfo};
+use crate::engine::commands::array_to_resp_array;
+use std::io::prelude::*;
+use std::net::TcpStream;
 
 pub trait MasterEngine {
     fn get_master_id(&self) -> String {
@@ -12,6 +15,8 @@ pub trait MasterEngine {
     fn get_slave_node(&self, _host: String, _port: String) -> Option<SlaveInfo> {
         return None;
     }
+    fn should_sync_command(&self) -> bool;
+    fn sync_command(&self, cmd: String) -> bool;
 }
 
 impl MasterEngine for StoreEngine {
@@ -63,5 +68,38 @@ impl MasterEngine for StoreEngine {
             .slave_list
             .get(&host_port)
             .cloned()
+    }
+
+    fn should_sync_command(&self) -> bool {
+        self.is_master() && self.master_info.read().unwrap().slave_list.len() > 0
+    }
+
+    fn sync_command(&self, cmd: String) -> bool {
+        if !self.should_sync_command() {
+            return false;
+        }
+
+        let mut sync = true;
+        let master_replid = self.get_master_id();
+        let mut slave_list = self.master_info.read().unwrap().slave_list.clone();
+
+        let mut buf = [0; 1024];
+
+        let cmd_vec: Vec<String> = cmd.split_whitespace().map(|s| s.to_string()).collect();
+        for (host_port, slave) in slave_list.iter_mut() {
+            let cmd_vec1 = cmd_vec.clone();
+            if slave.handshake_state == HandshakeState::Psync {
+                // send command to slave
+                if let Ok(mut stream) = TcpStream::connect(host_port.0.clone()) {
+                    if let Ok(_) = stream.write(array_to_resp_array(cmd_vec1).as_bytes()) {
+                        match stream.read(&mut buf) {
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+
+        sync
     }
 }
