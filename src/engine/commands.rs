@@ -207,7 +207,7 @@ fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<V
     Ok(ret_vec)
 }
 
-fn handle_psync(db: &Arc<StoreEngine>, _cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<Vec<u8>>> {
+fn handle_psync(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<Vec<u8>>> {
     let myid = db.get_master_id();
 
     // stage 1: return +FULLRESYNC and myid
@@ -217,6 +217,10 @@ fn handle_psync(db: &Arc<StoreEngine>, _cmd: Arc<RwLock<RespMessage>>) -> Result
     let rdb_snapshot = hex::decode(EMPTY_RDB).unwrap();
     let mut rdb_vec: Vec<u8> = string_to_bulk_string_for_psync(EMPTY_RDB.to_string()).into();
     rdb_vec.extend(&rdb_snapshot);
+
+    // update slave node handshake state
+    let host = cmd.read().unwrap().remote_addr.clone();
+    db.set_slave_node(host, String::from(""), HandshakeState::Psync);
 
     ret_vec.push(rdb_vec);
     Ok(ret_vec)
@@ -240,15 +244,6 @@ fn handle_replica(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Resul
             }
             "capa" => {
                 db.set_slave_node(host.clone(), String::from(""), HandshakeState::ReplconfCapa)
-            }
-            "psync" => {
-                if cmd.read().unwrap().vec_data.len() > 3 {
-                    let myid = cmd.read().unwrap().vec_data[2].str_data.clone();
-                    let offset = cmd.read().unwrap().vec_data[3].str_data.clone();
-                    if myid == "?" && offset == "-1" {
-                        db.set_slave_node(host.clone(), String::from(""), HandshakeState::Psync);
-                    }
-                }
             }
             _ => {}
         }
