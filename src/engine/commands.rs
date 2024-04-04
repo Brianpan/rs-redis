@@ -5,9 +5,10 @@ use super::{RespMessage, RespType};
 use crate::store::engine::StoreEngine;
 use crate::store::master_engine::MasterEngine;
 use crate::store::{HandshakeState, ReplicaType};
-
 use anyhow::Result;
 use hex;
+use tokio::net::TcpStream;
+use tokio::sync;
 
 // command consts
 const COMMAND_GET: &str = "get";
@@ -31,6 +32,7 @@ const EMPTY_RDB: &str = "524544495330303131fa0972656469732d76657205372e322e30fa0
 
 // we support multiple responses to handle commands like psync
 pub fn command_handler(
+    arc_stream: Arc<sync::RwLock<TcpStream>>,
     db: &Arc<StoreEngine>,
     cmd: Arc<RwLock<RespMessage>>,
 ) -> Result<Vec<Vec<u8>>> {

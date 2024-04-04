@@ -9,8 +9,13 @@ use super::{RespMessage, RespParsingState, RespType};
 use std::net::SocketAddr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tokio::sync;
 
-pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream, addr: SocketAddr) {
+pub async fn handle_connection(
+    db: &Arc<StoreEngine>,
+    arc_stream: Arc<sync::RwLock<TcpStream>>,
+    addr: SocketAddr,
+) {
     let mut cmd = String::new();
     let mut buf = [0; 512];
     let mut maybe_split = false;
@@ -25,8 +30,8 @@ pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream, add
     cmd_stack.push_back(Arc::new(RwLock::new(RespMessage::new(addr.clone()))));
 
     loop {
-        let _ = stream.readable().await;
-        let chrs = stream.read(&mut buf).await;
+        let _ = arc_stream.read().await.readable().await;
+        let chrs = arc_stream.write().await.read(&mut buf).await;
         match chrs {
             Ok(n) => {
                 if n == 0 {
@@ -65,19 +70,35 @@ pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream, add
                                             // move the array type out of the stack
                                             parent.write().unwrap().state = RespParsingState::End;
                                             if cmd_stack.is_empty() {
-                                                let resp = command_handler(db, parent.clone());
+                                                let resp = command_handler(
+                                                    arc_stream.clone(),
+                                                    db,
+                                                    parent.clone(),
+                                                );
                                                 if let Ok(resps) = resp {
                                                     for resp in resps {
-                                                        stream.write_all(&resp).await.unwrap();
+                                                        arc_stream
+                                                            .write()
+                                                            .await
+                                                            .write_all(&resp)
+                                                            .await
+                                                            .unwrap();
                                                     }
                                                 }
                                             }
                                         } else {
                                             cmd_stack.push_back(parent);
                                         }
-                                    } else if let Ok(resps) = command_handler(db, resp) {
+                                    } else if let Ok(resps) =
+                                        command_handler(arc_stream.clone(), db, resp)
+                                    {
                                         for resp in resps {
-                                            stream.write_all(&resp).await.unwrap();
+                                            arc_stream
+                                                .write()
+                                                .await
+                                                .write_all(&resp)
+                                                .await
+                                                .unwrap();
                                         }
                                     }
 
