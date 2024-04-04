@@ -79,8 +79,8 @@ impl MasterEngine for StoreEngine {
             return false;
         }
 
-        let mut sync = true;
-        let master_replid = self.get_master_id();
+        let sync = true;
+        let _master_replid = self.get_master_id();
         let mut slave_list = self.master_info.read().unwrap().slave_list.clone();
 
         let mut buf = [0; 1024];

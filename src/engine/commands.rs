@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::sync::{Arc, RwLock};
 
 use super::{RespMessage, RespType};
@@ -252,6 +251,8 @@ fn handle_replica(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Resul
     }
     let ret = RESP_OK;
     resp_vec.push(ret.to_string().as_bytes().to_vec());
+
+    println!("debug: {}", ret);
     Ok(resp_vec)
 }
 
