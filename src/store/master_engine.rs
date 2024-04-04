@@ -81,14 +81,15 @@ impl MasterEngine for StoreEngine {
         let cmd_vec: Vec<String> = cmd.split_whitespace().map(|s| s.to_string()).collect();
         for (host_port, slave) in slave_list.iter_mut() {
             let cmd_vec1 = cmd_vec.clone();
+            println!(
+                "send command to slave: {} {}",
+                host_port.0.clone(),
+                cmd.clone()
+            );
             if slave.handshake_state == HandshakeState::Psync {
                 // send command to slave
                 if let Ok(mut stream) = TcpStream::connect(host_port.0.clone()) {
-                    if let Ok(_) = stream.write(array_to_resp_array(cmd_vec1).as_bytes()) {
-                        match stream.read(&mut buf) {
-                            _ => {}
-                        }
-                    }
+                    if let Ok(_) = stream.write(array_to_resp_array(cmd_vec1).as_bytes()) {}
                 }
             }
         }
