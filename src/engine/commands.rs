@@ -112,9 +112,11 @@ pub fn command_handler(
                                     .str_data
                                     .parse::<u128>()
                                     .unwrap();
-                                db.set_with_expire(key, val, ttl);
+                                db.set_with_expire(key.clone(), val.clone(), ttl);
+                                db.sync_command(format!("SET {} {} {}", key, val, ttl));
                             } else {
-                                db.set(key, val);
+                                db.set(key.clone(), val.clone());
+                                db.sync_command(format!("SET {} {}", key, val));
                             }
 
                             resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());
