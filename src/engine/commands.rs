@@ -235,16 +235,20 @@ fn handle_replica(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Resul
         {
             "listening-port" => {
                 db.set_replica_as_master();
-                db.set_slave_node(remote_addr, port, HandshakeState::Replconf);
-                println!("debug3: {} {}", remote_addr, port);
+                db.set_slave_node(remote_addr.clone(), port.clone(), HandshakeState::Replconf);
+                println!("debug3: {} {}", remote_addr.clone(), port.clone());
             }
-            "capa" => db.set_slave_node(remote_addr, port, HandshakeState::ReplconfCapa),
+            "capa" => db.set_slave_node(
+                remote_addr.clone(),
+                port.clone(),
+                HandshakeState::ReplconfCapa,
+            ),
             "psync" => {
                 if cmd.read().unwrap().vec_data.len() > 3 {
                     let myid = cmd.read().unwrap().vec_data[2].str_data.clone();
                     let offset = cmd.read().unwrap().vec_data[3].str_data.clone();
                     if myid == "?" && offset == "-1" {
-                        db.set_slave_node(remote_addr, port, HandshakeState::Psync);
+                        db.set_slave_node(remote_addr.clone(), port.clone(), HandshakeState::Psync);
                     }
                 }
             }
