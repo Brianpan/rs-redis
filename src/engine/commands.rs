@@ -234,9 +234,11 @@ fn handle_replica(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Resul
             .as_str()
         {
             "listening-port" => {
+                println!("debug3-1: {} {}", remote_addr.clone(), port.clone());
                 db.set_replica_as_master();
+                println!("debug3-2: {} {}", remote_addr.clone(), port.clone());
                 db.set_slave_node(remote_addr.clone(), port.clone(), HandshakeState::Replconf);
-                println!("debug3: {} {}", remote_addr.clone(), port.clone());
+                println!("debug3-3: {} {}", remote_addr.clone(), port.clone());
             }
             "capa" => db.set_slave_node(
                 remote_addr.clone(),
