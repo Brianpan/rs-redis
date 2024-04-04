@@ -88,7 +88,11 @@ impl MasterEngine for StoreEngine {
                 // send command to slave
                 println!("send command2 to slave: {} {}", host.clone(), cmd.clone());
                 if let Ok(mut stream) = TcpStream::connect(host.clone()) {
-                    if let Ok(_) = stream.write(array_to_resp_array(cmd_vec1).as_bytes()) {}
+                    println!("send command3 to slave: {} {}", host.clone(), cmd.clone());
+                    if let Ok(_) = stream.write(array_to_resp_array(cmd_vec1).as_bytes()) {
+                        println!("send command4 to slave: {} {}", host.clone(), cmd.clone());
+                        stream.read(&mut buf);
+                    }
                 }
             }
         }
