@@ -223,32 +223,30 @@ fn handle_psync(db: &Arc<StoreEngine>, _cmd: Arc<RwLock<RespMessage>>) -> Result
 }
 
 fn handle_replica(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<Vec<u8>>> {
-    println!("debug1:");
     let mut resp_vec = Vec::new();
 
     if cmd.read().unwrap().vec_data.len() > 2 {
-        let port = cmd.read().unwrap().vec_data[2].str_data.clone();
-        let remote_addr = cmd.read().unwrap().remote_addr.clone();
+        let host = cmd.read().unwrap().remote_addr.clone();
+
         match cmd.read().unwrap().vec_data[1]
             .str_data
             .to_lowercase()
             .as_str()
         {
             "listening-port" => {
+                let port = cmd.read().unwrap().vec_data[2].str_data.clone();
                 db.set_replica_as_master();
-                db.set_slave_node(remote_addr.clone(), port.clone(), HandshakeState::Replconf);
+                db.set_slave_node(host.clone(), port.clone(), HandshakeState::Replconf);
             }
-            "capa" => db.set_slave_node(
-                remote_addr.clone(),
-                port.clone(),
-                HandshakeState::ReplconfCapa,
-            ),
+            "capa" => {
+                db.set_slave_node(host.clone(), String::from(""), HandshakeState::ReplconfCapa)
+            }
             "psync" => {
                 if cmd.read().unwrap().vec_data.len() > 3 {
                     let myid = cmd.read().unwrap().vec_data[2].str_data.clone();
                     let offset = cmd.read().unwrap().vec_data[3].str_data.clone();
                     if myid == "?" && offset == "-1" {
-                        db.set_slave_node(remote_addr.clone(), port.clone(), HandshakeState::Psync);
+                        db.set_slave_node(host.clone(), String::from(""), HandshakeState::Psync);
                     }
                 }
             }

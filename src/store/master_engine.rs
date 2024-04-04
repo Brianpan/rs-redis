@@ -29,7 +29,7 @@ impl MasterEngine for StoreEngine {
     }
 
     fn set_slave_node(&self, host: String, port: String, handshake_state: HandshakeState) {
-        let host_port = (host.clone(), port.clone());
+        let host_port = (host.clone(), String::from(""));
 
         let mut slave = SlaveInfo {
             host,
@@ -41,6 +41,7 @@ impl MasterEngine for StoreEngine {
 
         match self.master_info.read().unwrap().slave_list.get(&host_port) {
             Some(old_slave) => {
+                slave.port = old_slave.port.clone();
                 slave.slave_repl_offset = old_slave.slave_repl_offset;
             }
             None => {}
@@ -54,7 +55,7 @@ impl MasterEngine for StoreEngine {
     }
 
     fn get_slave_node(&self, host: String, port: String) -> Option<SlaveInfo> {
-        let host_port = (host, port);
+        let host_port = (host, String::from(""));
         self.master_info
             .read()
             .unwrap()
@@ -81,14 +82,11 @@ impl MasterEngine for StoreEngine {
         let cmd_vec: Vec<String> = cmd.split_whitespace().map(|s| s.to_string()).collect();
         for (host_port, slave) in slave_list.iter_mut() {
             let cmd_vec1 = cmd_vec.clone();
-            println!(
-                "send command to slave: {} {}",
-                host_port.0.clone(),
-                cmd.clone()
-            );
+            let host = format!("{}:{}", host_port.0.clone(), slave.port.clone());
+            println!("send command to slave: {} {}", host.clone(), cmd.clone());
             if slave.handshake_state == HandshakeState::Psync {
                 // send command to slave
-                if let Ok(mut stream) = TcpStream::connect(host_port.0.clone()) {
+                if let Ok(mut stream) = TcpStream::connect(host.clone()) {
                     if let Ok(_) = stream.write(array_to_resp_array(cmd_vec1).as_bytes()) {}
                 }
             }

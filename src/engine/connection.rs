@@ -15,7 +15,7 @@ pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream, add
     let mut buf = [0; 512];
     let mut maybe_split = false;
 
-    let addr = addr.to_string();
+    let addr = addr.ip().to_string();
 
     // stack to handle nested commands
     let mut cmd_stack: VecDeque<Arc<RwLock<RespMessage>>> = VecDeque::new();
