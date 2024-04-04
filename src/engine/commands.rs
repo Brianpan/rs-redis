@@ -221,6 +221,7 @@ fn handle_psync(db: &Arc<StoreEngine>, _cmd: Arc<RwLock<RespMessage>>) -> Result
 }
 
 fn handle_replica(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<Vec<u8>>> {
+    println!("debug1:");
     let mut resp_vec = Vec::new();
 
     if cmd.read().unwrap().vec_data.len() > 2 {
