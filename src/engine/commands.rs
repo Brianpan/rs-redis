@@ -227,7 +227,7 @@ fn handle_replica(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Resul
     if cmd.read().unwrap().vec_data.len() > 2 {
         let port = cmd.read().unwrap().vec_data[2].str_data.clone();
         let remote_addr = cmd.read().unwrap().remote_addr.clone();
-
+        println!("debug2:");
         match cmd.read().unwrap().vec_data[1]
             .str_data
             .to_lowercase()
@@ -236,6 +236,7 @@ fn handle_replica(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Resul
             "listening-port" => {
                 db.set_replica_as_master();
                 db.set_slave_node(remote_addr, port, HandshakeState::Replconf);
+                println!("debug3: {} {}", remote_addr, port);
             }
             "capa" => db.set_slave_node(remote_addr, port, HandshakeState::ReplconfCapa),
             "psync" => {
