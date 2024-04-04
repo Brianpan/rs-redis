@@ -40,10 +40,8 @@ impl MasterEngine for StoreEngine {
         };
 
         match self.master_info.read().unwrap().slave_list.get(&host_port) {
-            Some(slave) => {
-                slave.handshake_state = handshake_state;
-                slave.slave_repl_offset = 0;
-                slave.master_replid = self.get_master_id();
+            Some(old_slave) => {
+                slave.slave_repl_offset = old_slave.slave_repl_offset;
             }
             None => {}
         }
