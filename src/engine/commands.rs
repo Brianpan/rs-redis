@@ -30,7 +30,7 @@ const MYID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 const EMPTY_RDB: &str = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
 
 // we support multiple responses to handle commands like psync
-pub async fn command_handler(
+pub fn command_handler(
     arc_stream: Arc<RwLock<TcpStream>>,
     db: &Arc<StoreEngine>,
     cmd: Arc<RwLock<RespMessage>>,
@@ -114,10 +114,10 @@ pub async fn command_handler(
                                     .parse::<u128>()
                                     .unwrap();
                                 db.set_with_expire(key.clone(), val.clone(), ttl);
-                                db.sync_command(format!("SET {} {} {}", key, val, ttl));
+                                let _ = db.sync_command(format!("SET {} {} {}", key, val, ttl));
                             } else {
                                 db.set(key.clone(), val.clone());
-                                db.sync_command(format!("SET {} {}", key, val));
+                                let _ = db.sync_command(format!("SET {} {}", key, val));
                             }
 
                             resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());

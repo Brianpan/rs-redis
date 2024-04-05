@@ -74,8 +74,8 @@ pub async fn handle_connection(
                                                     stream.clone(),
                                                     db,
                                                     parent.clone(),
-                                                )
-                                                .await;
+                                                );
+
                                                 if let Ok(resps) = resp {
                                                     for resp in resps {
                                                         stream
@@ -90,7 +90,7 @@ pub async fn handle_connection(
                                             cmd_stack.push_back(parent);
                                         }
                                     } else if let Ok(resps) =
-                                        command_handler(stream.clone(), db, resp).await
+                                        command_handler(stream.clone(), db, resp)
                                     {
                                         for resp in resps {
                                             stream.write().unwrap().write_all(&resp).unwrap();
@@ -120,7 +120,7 @@ pub async fn handle_connection(
                 }
             }
             Err(_) => {
-                break;
+                continue;
             }
         }
     }
