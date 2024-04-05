@@ -98,11 +98,8 @@ impl MasterEngine for StoreEngine {
             let cmd_vec1 = cmd_vec.clone();
             let host = host_port.0.clone();
 
-            println!("send command to slave: {} {}", host.clone(), cmd.clone());
-
             if slave.handshake_state == HandshakeState::Psync {
                 // send command to slave
-                println!("send command2 to slave: {} {}", host.clone(), cmd.clone());
                 let cmd = array_to_resp_array(cmd_vec1);
                 if let Some(mut stream) =
                     self.master_info.read().unwrap().replicas.get(&host.clone())
