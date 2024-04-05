@@ -1,8 +1,9 @@
 use super::engine::StoreEngine;
-use super::{HandshakeState, HostPort, ReplicaType, SlaveInfo};
+use super::{HandshakeState, ReplicaType, SlaveInfo};
 use crate::engine::commands::array_to_resp_array;
 use std::io::prelude::*;
 use std::net::TcpStream;
+use std::sync::{Arc, RwLock};
 
 pub trait MasterEngine {
     fn get_master_id(&self) -> String {
@@ -15,8 +16,11 @@ pub trait MasterEngine {
     fn get_slave_node(&self, _host: String, _port: String) -> Option<SlaveInfo> {
         return None;
     }
+
+    fn set_replicas(&self, host: String, stream: Arc<RwLock<TcpStream>>);
+
     fn should_sync_command(&self) -> bool;
-    fn sync_command(&self, cmd: String) -> bool;
+    fn sync_command(&self, cmd: String) -> anyhow::Result<()>;
 }
 
 impl MasterEngine for StoreEngine {
@@ -46,12 +50,21 @@ impl MasterEngine for StoreEngine {
             }
             None => {}
         }
+
         // to avoid deadlock
         self.master_info
             .write()
             .unwrap()
             .slave_list
             .insert(host_port, slave);
+    }
+
+    fn set_replicas(&self, host: String, stream: Arc<RwLock<TcpStream>>) {
+        self.master_info
+            .write()
+            .unwrap()
+            .replicas
+            .insert(host.clone(), stream.clone());
     }
 
     fn get_slave_node(&self, host: String, port: String) -> Option<SlaveInfo> {
@@ -68,9 +81,9 @@ impl MasterEngine for StoreEngine {
         self.is_master() && self.master_info.read().unwrap().slave_list.len() > 0
     }
 
-    fn sync_command(&self, cmd: String) -> bool {
+    fn sync_command(&self, cmd: String) -> anyhow::Result<()> {
         if !self.should_sync_command() {
-            return false;
+            return Err(anyhow::anyhow!("err: should not sync command"));
         }
 
         let sync = true;
@@ -80,33 +93,26 @@ impl MasterEngine for StoreEngine {
         let mut buf = [0; 1024];
 
         let cmd_vec: Vec<String> = cmd.split_whitespace().map(|s| s.to_string()).collect();
+
         for (host_port, slave) in slave_list.iter_mut() {
             let cmd_vec1 = cmd_vec.clone();
-            let host = format!("{}:{}", host_port.0.clone(), slave.port.clone());
+            let host = host_port.0.clone();
+
             println!("send command to slave: {} {}", host.clone(), cmd.clone());
+
             if slave.handshake_state == HandshakeState::Psync {
                 // send command to slave
                 println!("send command2 to slave: {} {}", host.clone(), cmd.clone());
-                match TcpStream::connect(host.clone()) {
-                    Ok(mut stream) => {
-                        println!("send command3 to slave: {} {}", host.clone(), cmd.clone());
-                        if let Ok(_) = stream.write(array_to_resp_array(cmd_vec1).as_bytes()) {
-                            println!("send command4 to slave: {} {}", host.clone(), cmd.clone());
-                            let _ = stream.read(&mut buf);
-                        }
-                    }
-                    Err(e) => {
-                        println!(
-                            "send command5 to slave: {} {}, {}",
-                            host.clone(),
-                            cmd.clone(),
-                            e
-                        );
-                    }
+                let cmd = array_to_resp_array(cmd_vec1);
+                if let Some(mut stream) =
+                    self.master_info.read().unwrap().replicas.get(&host.clone())
+                {
+                    let mut stream = stream.write().unwrap();
+
+                    stream.write_all(&cmd.as_bytes())?;
                 }
             }
         }
-
-        sync
+        Ok(())
     }
 }

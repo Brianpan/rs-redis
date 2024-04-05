@@ -6,14 +6,14 @@ use crate::store::engine::StoreEngine;
 use super::commands::command_handler;
 use super::{RespMessage, RespParsingState, RespType};
 
+use std::io::prelude::*;
 use std::net::SocketAddr;
+use std::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
-use tokio::sync;
 
 pub async fn handle_connection(
     db: &Arc<StoreEngine>,
-    arc_stream: Arc<sync::RwLock<TcpStream>>,
+    stream: Arc<RwLock<TcpStream>>,
     addr: SocketAddr,
 ) {
     let mut cmd = String::new();
@@ -30,8 +30,8 @@ pub async fn handle_connection(
     cmd_stack.push_back(Arc::new(RwLock::new(RespMessage::new(addr.clone()))));
 
     loop {
-        let _ = arc_stream.read().await.readable().await;
-        let chrs = arc_stream.write().await.read(&mut buf).await;
+        // let _ = stream.read().unwrap().readable();
+        let chrs = stream.write().unwrap().read(&mut buf);
         match chrs {
             Ok(n) => {
                 if n == 0 {
@@ -71,17 +71,17 @@ pub async fn handle_connection(
                                             parent.write().unwrap().state = RespParsingState::End;
                                             if cmd_stack.is_empty() {
                                                 let resp = command_handler(
-                                                    arc_stream.clone(),
+                                                    stream.clone(),
                                                     db,
                                                     parent.clone(),
-                                                );
+                                                )
+                                                .await;
                                                 if let Ok(resps) = resp {
                                                     for resp in resps {
-                                                        arc_stream
+                                                        stream
                                                             .write()
-                                                            .await
+                                                            .unwrap()
                                                             .write_all(&resp)
-                                                            .await
                                                             .unwrap();
                                                     }
                                                 }
@@ -90,15 +90,10 @@ pub async fn handle_connection(
                                             cmd_stack.push_back(parent);
                                         }
                                     } else if let Ok(resps) =
-                                        command_handler(arc_stream.clone(), db, resp)
+                                        command_handler(stream.clone(), db, resp).await
                                     {
                                         for resp in resps {
-                                            arc_stream
-                                                .write()
-                                                .await
-                                                .write_all(&resp)
-                                                .await
-                                                .unwrap();
+                                            stream.write().unwrap().write_all(&resp).unwrap();
                                         }
                                     }
 

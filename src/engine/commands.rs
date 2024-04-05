@@ -7,8 +7,7 @@ use crate::store::master_engine::MasterEngine;
 use crate::store::{HandshakeState, ReplicaType};
 use anyhow::Result;
 use hex;
-use tokio::net::TcpStream;
-use tokio::sync;
+use std::net::TcpStream;
 
 // command consts
 const COMMAND_GET: &str = "get";
@@ -31,8 +30,8 @@ const MYID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 const EMPTY_RDB: &str = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
 
 // we support multiple responses to handle commands like psync
-pub fn command_handler(
-    arc_stream: Arc<sync::RwLock<TcpStream>>,
+pub async fn command_handler(
+    arc_stream: Arc<RwLock<TcpStream>>,
     db: &Arc<StoreEngine>,
     cmd: Arc<RwLock<RespMessage>>,
 ) -> Result<Vec<Vec<u8>>> {
@@ -142,7 +141,7 @@ pub fn command_handler(
                         // replconf always return OK
                         COMMAND_REPLCONF => handle_replica(&db.clone(), cmd.clone()),
                         // psync return from master node with fullresync and myid
-                        COMMAND_PSYNC => handle_psync(&db.clone(), cmd.clone()),
+                        COMMAND_PSYNC => handle_psync(&db.clone(), arc_stream.clone(), cmd.clone()),
                         _ => {
                             resp_vec.push(RESP_EMPTY.to_string().as_bytes().to_vec());
                             Ok(resp_vec)
@@ -209,7 +208,11 @@ fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<V
     Ok(ret_vec)
 }
 
-fn handle_psync(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<Vec<u8>>> {
+fn handle_psync(
+    db: &Arc<StoreEngine>,
+    stream: Arc<RwLock<TcpStream>>,
+    cmd: Arc<RwLock<RespMessage>>,
+) -> Result<Vec<Vec<u8>>> {
     let myid = db.get_master_id();
 
     // stage 1: return +FULLRESYNC and myid
@@ -222,7 +225,10 @@ fn handle_psync(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<
 
     // update slave node handshake state
     let host = cmd.read().unwrap().remote_addr.clone();
-    db.set_slave_node(host, String::from(""), HandshakeState::Psync);
+    db.set_slave_node(host.clone(), String::from(""), HandshakeState::Psync);
+
+    // we need to store stream to replicas
+    db.set_replicas(host.clone(), stream.clone());
 
     ret_vec.push(rdb_vec);
     Ok(ret_vec)

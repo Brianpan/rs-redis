@@ -2,6 +2,9 @@ pub mod engine;
 pub mod master_engine;
 
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+
+use std::net::TcpStream;
 
 const MYID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 
@@ -30,6 +33,7 @@ pub struct MasterInfo {
     master_repl_offset: u64,
     pub handshake_state: HandshakeState,
     slave_list: HashMap<HostPort, SlaveInfo>,
+    replicas: HashMap<String, Arc<RwLock<TcpStream>>>,
 }
 
 #[derive(Clone)]
@@ -56,6 +60,7 @@ impl Default for MasterInfo {
             master_repl_offset: 0,
             handshake_state: HandshakeState::Ping,
             slave_list: HashMap::new(),
+            replicas: HashMap::new(),
         }
     }
 }
