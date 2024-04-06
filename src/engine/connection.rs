@@ -29,9 +29,8 @@ pub async fn handle_connection(
     // this cmd stack is used to track nested commands specifically for array type
     cmd_stack.push_back(Arc::new(RwLock::new(RespMessage::new(addr.clone()))));
 
-    let actor = ReplicatorHandle::new();
+    let actor = ReplicatorHandle::new(db.clone());
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-    println!("after actor in handle_connection");
 
     loop {
         // let _ = stream.read().unwrap().readable();

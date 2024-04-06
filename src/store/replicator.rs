@@ -1,3 +1,6 @@
+use super::engine::StoreEngine;
+use super::master_engine::MasterEngine;
+use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
 pub enum ReplicatorActorMessage {
@@ -7,6 +10,7 @@ pub enum ReplicatorActorMessage {
     },
 }
 pub struct ReplicatorActor {
+    db: Arc<StoreEngine>,
     receiver: mpsc::Receiver<ReplicatorActorMessage>,
 }
 
@@ -15,15 +19,15 @@ pub struct ReplicatorHandle {
 }
 
 impl ReplicatorActor {
-    pub fn new(receiver: mpsc::Receiver<ReplicatorActorMessage>) -> Self {
-        ReplicatorActor { receiver }
+    pub fn new(db: Arc<StoreEngine>, receiver: mpsc::Receiver<ReplicatorActorMessage>) -> Self {
+        ReplicatorActor { db, receiver }
     }
 
     pub fn handle(&mut self, msg: ReplicatorActorMessage) {
-        println!("replicator received message");
         match msg {
             ReplicatorActorMessage::SetOp { cmd, respond_to } => {
                 println!("replicator received command: {}", cmd);
+                let _ = self.db.sync_command(cmd);
                 let _ = respond_to.send(true);
             }
         }
@@ -31,25 +35,21 @@ impl ReplicatorActor {
 }
 
 async fn run_replicator(mut actor: ReplicatorActor) {
-    println!("replicator started");
     while let Some(msg) = actor.receiver.recv().await {
-        println!("replicator handling message");
         actor.handle(msg);
     }
 }
 
 impl ReplicatorHandle {
-    pub fn new() -> Self {
+    pub fn new(db: Arc<StoreEngine>) -> Self {
         let (sender, receiver) = mpsc::channel(128);
-        let actor = ReplicatorActor::new(receiver);
-        println!("new replicator handle created");
+        let actor = ReplicatorActor::new(db, receiver);
         tokio::spawn(run_replicator(actor));
 
         Self { sender }
     }
 
     pub async fn set_op(&self, cmd: String) -> bool {
-        println!("set_op called");
         let (tx, rx) = oneshot::channel();
         let msg = ReplicatorActorMessage::SetOp {
             cmd,

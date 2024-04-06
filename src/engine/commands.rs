@@ -107,23 +107,23 @@ pub fn command_handler(
                                     .parse::<u128>()
                                     .unwrap();
                                 db.set_with_expire(key.clone(), val.clone(), ttl);
-                                let _ = db.sync_command(format!(
-                                    "SET {} {} {}",
-                                    key.clone(),
-                                    val.clone(),
-                                    ttl.clone()
-                                ));
+                                // let _ = db.sync_command(format!(
+                                //     "SET {} {} {}",
+                                //     key.clone(),
+                                //     val.clone(),
+                                //     ttl.clone()
+                                // ));
 
                                 repl_command.push_str(format!(" {}", ttl.clone()).as_str());
                             } else {
                                 db.set(key.clone(), val.clone());
-                                let _ =
-                                    db.sync_command(format!("SET {} {}", key.clone(), val.clone()));
+                                // let _ =
+                                //     db.sync_command(format!("SET {} {}", key.clone(), val.clone()));
                             }
 
                             resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());
 
-                            if db.should_sync_command() || true {
+                            if db.should_sync_command() {
                                 Ok(CommandHandlerResponse::Replica {
                                     message: resp_vec,
                                     cmd: repl_command,
