@@ -102,8 +102,9 @@ impl MasterEngine for StoreEngine {
 
         for (host, slave) in slave_list.iter_mut() {
             let cmd_vec1 = cmd_vec.clone();
-            println!("syncing command to slave: {} {}", host, cmd.clone());
+
             if slave.handshake_state == HandshakeState::Psync {
+                println!("syncing command to slave: {} {}", host, cmd.clone());
                 // send command to slave
                 let cmd = array_to_resp_array(cmd_vec1);
                 if let Some(stream) = self.replicas.read().await.get(&host.clone()) {
