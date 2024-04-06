@@ -16,8 +16,6 @@ pub enum HandshakeState {
     Psync,
 }
 
-pub type HostPort = (String, String);
-
 #[derive(Clone, PartialEq)]
 pub enum ReplicaType {
     Master,
@@ -32,7 +30,7 @@ pub struct MasterInfo {
     master_replid: String,
     master_repl_offset: u64,
     pub handshake_state: HandshakeState,
-    slave_list: HashMap<HostPort, SlaveInfo>,
+    slave_list: HashMap<String, SlaveInfo>,
     replicas: HashMap<String, Arc<RwLock<TcpStream>>>,
 }
 

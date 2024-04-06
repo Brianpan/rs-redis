@@ -1,5 +1,19 @@
 pub mod commands;
 pub mod connection;
+mod handler;
+
+use hex;
+
+const RESP_OK: &str = "+OK\r\n";
+const RESP_ERR: &str = "-ERR\r\n";
+const RESP_PONG: &str = "+PONG\r\n";
+const RESP_EMPTY: &str = "*0\r\n";
+
+// preset id of master node (40 chars long)
+// it will be changed to a random value in the future
+const MYID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
+
+const EMPTY_RDB: &str = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
 
 #[derive(PartialEq, Clone)]
 pub enum RespParsingState {
@@ -122,4 +136,24 @@ impl RespMessage {
             self.state = RespParsingState::ParsingData;
         }
     }
+}
+
+pub fn string_to_bulk_string(s: String) -> String {
+    format!("${}\r\n{}\r\n", s.len(), s)
+}
+
+pub fn string_to_bulk_string_for_psync(s: String) -> String {
+    let rdb_decode = hex::decode(s).unwrap();
+    format!("${}\r\n", rdb_decode.len())
+}
+
+pub fn array_to_resp_array(vec: Vec<String>) -> String {
+    let mut ret = String::new();
+    ret.push_str(format!("*{}\r\n", vec.len()).as_str());
+
+    for v in vec {
+        ret.push_str(&string_to_bulk_string(v));
+    }
+
+    return ret;
 }

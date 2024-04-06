@@ -1,12 +1,12 @@
 use std::sync::{Arc, RwLock};
 
-use super::{RespMessage, RespType};
+use super::handler::{handle_info, handle_psync, handle_replica};
+use super::{RespMessage, RespType, RESP_EMPTY, RESP_ERR, RESP_OK, RESP_PONG};
 
+use super::string_to_bulk_string;
 use crate::store::engine::StoreEngine;
 use crate::store::master_engine::MasterEngine;
-use crate::store::{HandshakeState, ReplicaType};
 use anyhow::Result;
-use hex;
 use std::net::TcpStream;
 
 // command consts
@@ -17,17 +17,6 @@ const COMMAND_ECHO: &str = "echo";
 const COMMAND_INFO: &str = "info";
 const COMMAND_REPLCONF: &str = "replconf";
 const COMMAND_PSYNC: &str = "psync";
-
-const RESP_OK: &str = "+OK\r\n";
-const RESP_ERR: &str = "-ERR\r\n";
-const RESP_PONG: &str = "+PONG\r\n";
-const RESP_EMPTY: &str = "*0\r\n";
-
-// preset id of master node (40 chars long)
-// it will be changed to a random value in the future
-const MYID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
-
-const EMPTY_RDB: &str = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
 
 // we support multiple responses to handle commands like psync
 pub fn command_handler(
@@ -158,126 +147,4 @@ pub fn command_handler(
     };
 
     ret
-}
-
-fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<Vec<u8>>> {
-    let mut lookup_keys: Vec<String> = Vec::new();
-    for i in 1..cmd.read().unwrap().vec_data.len() {
-        lookup_keys.push(cmd.read().unwrap().vec_data[i as usize].str_data.clone());
-    }
-
-    let mut ret_vec = Vec::new();
-    let mut ret = String::new();
-
-    if lookup_keys.is_empty() {
-        let db_info = "db_size: 0".to_string();
-        ret.push_str(&string_to_bulk_string(db_info));
-    } else {
-        let mut key_iter = lookup_keys.iter();
-        let mut idx = 0;
-        while let Some(k) = key_iter.next() {
-            match k.to_lowercase().as_str() {
-                "replication" => {
-                    if idx == 0 {
-                        // generate role info
-                        match db.get_replica() {
-                            ReplicaType::Master => {
-                                let mut master_info = String::from("role:master\r\n");
-                                let master_repl_id = format!("master_replid:{}\r\n", MYID);
-
-                                // generate master_repl_id, master_repl_offset
-                                master_info = master_info + &master_repl_id;
-                                let master_repl_offset = "master_repl_offset:0".to_string();
-                                master_info = master_info + &master_repl_offset;
-
-                                ret.push_str(&string_to_bulk_string(master_info));
-                            }
-                            ReplicaType::Slave(_) => {
-                                ret.push_str(&string_to_bulk_string("role:slave".to_string()));
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-            idx += 1;
-        }
-    }
-
-    ret_vec.push(ret.as_bytes().to_vec());
-    Ok(ret_vec)
-}
-
-fn handle_psync(
-    db: &Arc<StoreEngine>,
-    stream: Arc<RwLock<TcpStream>>,
-    cmd: Arc<RwLock<RespMessage>>,
-) -> Result<Vec<Vec<u8>>> {
-    let myid = db.get_master_id();
-
-    // stage 1: return +FULLRESYNC and myid
-    let ret = format!("+FULLRESYNC {} 0\r\n", myid);
-    let mut ret_vec = Vec::new();
-    ret_vec.push(ret.as_bytes().to_vec());
-    let rdb_snapshot = hex::decode(EMPTY_RDB).unwrap();
-    let mut rdb_vec: Vec<u8> = string_to_bulk_string_for_psync(EMPTY_RDB.to_string()).into();
-    rdb_vec.extend(&rdb_snapshot);
-
-    // update slave node handshake state
-    let host = cmd.read().unwrap().remote_addr.clone();
-    db.set_slave_node(host.clone(), String::from(""), HandshakeState::Psync);
-
-    // we need to store stream to replicas
-    db.set_replicas(host.clone(), stream.clone());
-
-    ret_vec.push(rdb_vec);
-    Ok(ret_vec)
-}
-
-fn handle_replica(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<Vec<u8>>> {
-    let mut resp_vec = Vec::new();
-
-    if cmd.read().unwrap().vec_data.len() > 2 {
-        let host = cmd.read().unwrap().remote_addr.clone();
-
-        match cmd.read().unwrap().vec_data[1]
-            .str_data
-            .to_lowercase()
-            .as_str()
-        {
-            "listening-port" => {
-                let port = cmd.read().unwrap().vec_data[2].str_data.clone();
-                db.set_replica_as_master();
-                db.set_slave_node(host.clone(), port.clone(), HandshakeState::Replconf);
-            }
-            "capa" => {
-                db.set_slave_node(host.clone(), String::from(""), HandshakeState::ReplconfCapa)
-            }
-            _ => {}
-        }
-    }
-    let ret = RESP_OK;
-    resp_vec.push(ret.to_string().as_bytes().to_vec());
-
-    Ok(resp_vec)
-}
-
-pub fn string_to_bulk_string(s: String) -> String {
-    format!("${}\r\n{}\r\n", s.len(), s)
-}
-
-pub fn string_to_bulk_string_for_psync(s: String) -> String {
-    let rdb_decode = hex::decode(s).unwrap();
-    format!("${}\r\n", rdb_decode.len())
-}
-
-pub fn array_to_resp_array(vec: Vec<String>) -> String {
-    let mut ret = String::new();
-    ret.push_str(format!("*{}\r\n", vec.len()).as_str());
-
-    for v in vec {
-        ret.push_str(&string_to_bulk_string(v));
-    }
-
-    return ret;
 }

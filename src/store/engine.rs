@@ -1,5 +1,5 @@
 use super::{HandshakeState, MasterInfo, NodeInfo, ReplicaType, SlaveInfo};
-use crate::engine::commands::array_to_resp_array;
+use crate::engine::array_to_resp_array;
 use priority_queue::PriorityQueue;
 use std::cmp::Reverse;
 use std::collections::HashMap;

@@ -9,7 +9,6 @@ use super::{RespMessage, RespParsingState, RespType};
 use std::io::prelude::*;
 use std::net::SocketAddr;
 use std::net::TcpStream;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub async fn handle_connection(
     db: &Arc<StoreEngine>,

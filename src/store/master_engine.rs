@@ -1,6 +1,6 @@
 use super::engine::StoreEngine;
 use super::{HandshakeState, ReplicaType, SlaveInfo};
-use crate::engine::commands::array_to_resp_array;
+use crate::engine::array_to_resp_array;
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::sync::{Arc, RwLock};
@@ -12,10 +12,8 @@ pub trait MasterEngine {
     fn is_master(&self) -> bool {
         return false;
     }
-    fn set_slave_node(&self, _host: String, _port: String, _handshake_state: HandshakeState) {}
-    fn get_slave_node(&self, _host: String, _port: String) -> Option<SlaveInfo> {
-        return None;
-    }
+    fn set_slave_node(&self, _host: String, stream_port: String, _handshake_state: HandshakeState);
+    fn get_slave_node(&self, host: String) -> Option<SlaveInfo>;
 
     fn set_replicas(&self, host: String, stream: Arc<RwLock<TcpStream>>);
 
@@ -32,18 +30,22 @@ impl MasterEngine for StoreEngine {
         self.get_replica() == ReplicaType::Master
     }
 
-    fn set_slave_node(&self, host: String, port: String, handshake_state: HandshakeState) {
-        let host_port = (host.clone(), String::from(""));
-
+    fn set_slave_node(&self, host: String, stream_port: String, handshake_state: HandshakeState) {
         let mut slave = SlaveInfo {
-            host,
-            port,
+            host: host.clone(),
+            port: stream_port,
             master_replid: self.get_master_id(),
             slave_repl_offset: 0,
             handshake_state,
         };
 
-        match self.master_info.read().unwrap().slave_list.get(&host_port) {
+        match self
+            .master_info
+            .read()
+            .unwrap()
+            .slave_list
+            .get(&host.clone())
+        {
             Some(old_slave) => {
                 slave.port = old_slave.port.clone();
                 slave.slave_repl_offset = old_slave.slave_repl_offset;
@@ -56,7 +58,7 @@ impl MasterEngine for StoreEngine {
             .write()
             .unwrap()
             .slave_list
-            .insert(host_port, slave);
+            .insert(host.clone(), slave);
     }
 
     fn set_replicas(&self, host: String, stream: Arc<RwLock<TcpStream>>) {
@@ -67,13 +69,12 @@ impl MasterEngine for StoreEngine {
             .insert(host.clone(), stream.clone());
     }
 
-    fn get_slave_node(&self, host: String, port: String) -> Option<SlaveInfo> {
-        let host_port = (host, String::from(""));
+    fn get_slave_node(&self, host: String) -> Option<SlaveInfo> {
         self.master_info
             .read()
             .unwrap()
             .slave_list
-            .get(&host_port)
+            .get(&host.clone())
             .cloned()
     }
 
@@ -86,24 +87,18 @@ impl MasterEngine for StoreEngine {
             return Err(anyhow::anyhow!("err: should not sync command"));
         }
 
-        let sync = true;
         let _master_replid = self.get_master_id();
         let mut slave_list = self.master_info.read().unwrap().slave_list.clone();
 
-        let mut buf = [0; 1024];
-
         let cmd_vec: Vec<String> = cmd.split_whitespace().map(|s| s.to_string()).collect();
 
-        for (host_port, slave) in slave_list.iter_mut() {
+        for (host, slave) in slave_list.iter_mut() {
             let cmd_vec1 = cmd_vec.clone();
-            let host = host_port.0.clone();
 
             if slave.handshake_state == HandshakeState::Psync {
                 // send command to slave
                 let cmd = array_to_resp_array(cmd_vec1);
-                if let Some(mut stream) =
-                    self.master_info.read().unwrap().replicas.get(&host.clone())
-                {
+                if let Some(stream) = self.master_info.read().unwrap().replicas.get(&host.clone()) {
                     let mut stream = stream.write().unwrap();
 
                     stream.write_all(&cmd.as_bytes())?;
