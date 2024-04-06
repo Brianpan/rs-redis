@@ -1,9 +1,11 @@
 use super::engine::StoreEngine;
 use super::{HandshakeState, ReplicaType, SlaveInfo};
 use crate::engine::array_to_resp_array;
-use std::io::prelude::*;
-use std::net::TcpStream;
+// use std::io::prelude::*;
 use std::sync::{Arc, RwLock};
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
+use tokio::sync::Mutex;
 
 pub trait MasterEngine {
     fn get_master_id(&self) -> String {
@@ -15,10 +17,10 @@ pub trait MasterEngine {
     fn set_slave_node(&self, _host: String, stream_port: String, _handshake_state: HandshakeState);
     fn get_slave_node(&self, host: String) -> Option<SlaveInfo>;
 
-    fn set_replicas(&self, host: String, stream: Arc<RwLock<TcpStream>>);
+    fn set_replicas(&self, host: String, stream: Arc<Mutex<TcpStream>>);
 
     fn should_sync_command(&self) -> bool;
-    fn sync_command(&self, cmd: String) -> anyhow::Result<()>;
+    async fn sync_command(&self, cmd: String) -> anyhow::Result<()>;
 }
 
 impl MasterEngine for StoreEngine {
@@ -61,7 +63,7 @@ impl MasterEngine for StoreEngine {
             .insert(host.clone(), slave);
     }
 
-    fn set_replicas(&self, host: String, stream: Arc<RwLock<TcpStream>>) {
+    fn set_replicas(&self, host: String, stream: Arc<Mutex<TcpStream>>) {
         self.master_info
             .write()
             .unwrap()
@@ -82,7 +84,7 @@ impl MasterEngine for StoreEngine {
         self.is_master() && self.master_info.read().unwrap().slave_list.len() > 0
     }
 
-    fn sync_command(&self, cmd: String) -> anyhow::Result<()> {
+    async fn sync_command(&self, cmd: String) -> anyhow::Result<()> {
         if !self.should_sync_command() {
             return Err(anyhow::anyhow!("err: should not sync command"));
         }
@@ -98,11 +100,22 @@ impl MasterEngine for StoreEngine {
             if slave.handshake_state == HandshakeState::Psync {
                 // send command to slave
                 let cmd = array_to_resp_array(cmd_vec1);
-                if let Some(stream) = self.master_info.read().unwrap().replicas.get(&host.clone()) {
-                    let mut stream = stream.write().unwrap();
+                // if let Some(stream) = self.master_info.read().unwrap().replicas.get(&host.clone()) {
+                // let mut stream = stream.lock().await;
+                // stream.write_all(&cmd.as_bytes()).await;
+                // }
 
-                    stream.write_all(&cmd.as_bytes())?;
-                }
+                // self.master_info
+                //     .read()
+                //     .unwrap()
+                //     .replicas
+                //     .get(&host.clone())
+                //     .unwrap()
+                //     .lock()
+                //     .await
+                //     .write_all(&cmd.as_bytes())
+                //     .await;
+                println!("TBD sync");
             }
         }
         Ok(())

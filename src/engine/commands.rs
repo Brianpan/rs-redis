@@ -9,7 +9,8 @@ use super::string_to_bulk_string;
 use crate::store::engine::StoreEngine;
 use crate::store::master_engine::MasterEngine;
 use anyhow::Result;
-use std::net::TcpStream;
+use tokio::net::TcpStream;
+use tokio::sync::Mutex;
 
 // command consts
 const COMMAND_GET: &str = "get";
@@ -22,7 +23,7 @@ const COMMAND_PSYNC: &str = "psync";
 
 // we support multiple responses to handle commands like psync
 pub fn command_handler(
-    arc_stream: Arc<RwLock<TcpStream>>,
+    arc_stream: Arc<Mutex<TcpStream>>,
     db: &Arc<StoreEngine>,
     cmd: Arc<RwLock<RespMessage>>,
 ) -> Result<CommandHandlerResponse> {

@@ -10,7 +10,8 @@ use crate::store::master_engine::MasterEngine;
 use crate::store::{HandshakeState, ReplicaType};
 
 use anyhow::Result;
-use std::net::TcpStream;
+use tokio::net::TcpStream;
+use tokio::sync::Mutex;
 
 pub fn handle_info(
     db: &Arc<StoreEngine>,
@@ -65,7 +66,7 @@ pub fn handle_info(
 
 pub fn handle_psync(
     db: &Arc<StoreEngine>,
-    stream: Arc<RwLock<TcpStream>>,
+    stream: Arc<Mutex<TcpStream>>,
     cmd: Arc<RwLock<RespMessage>>,
 ) -> Result<CommandHandlerResponse> {
     let myid = db.get_master_id();

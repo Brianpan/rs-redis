@@ -9,11 +9,14 @@ use crate::store::replicator::ReplicatorHandle;
 
 use std::io::prelude::*;
 use std::net::SocketAddr;
-use std::net::TcpStream;
+use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
+use tokio::sync::Mutex;
 
 pub async fn handle_connection(
     db: &Arc<StoreEngine>,
-    stream: Arc<RwLock<TcpStream>>,
+    stream: Arc<Mutex<TcpStream>>,
     addr: SocketAddr,
 ) {
     let mut cmd = String::new();
@@ -35,8 +38,8 @@ pub async fn handle_connection(
 
     println!("New connection from: {}", addr.clone());
     loop {
-        // let _ = stream.read().unwrap().readable();
-        let chrs = stream.write().unwrap().read(&mut buf);
+        let _ = stream.lock().await.readable();
+        let chrs = stream.lock().await.read(&mut buf).await;
         match chrs {
             Ok(n) => {
                 if n == 0 {
@@ -81,30 +84,12 @@ pub async fn handle_connection(
                                                     parent.clone(),
                                                 );
                                                 if let Ok(resps) = resp {
-                                                    match resps {
-                                                        CommandHandlerResponse::Basic(resps) => {
-                                                            for resp in resps {
-                                                                stream
-                                                                    .write()
-                                                                    .unwrap()
-                                                                    .write_all(&resp)
-                                                                    .unwrap();
-                                                            }
-                                                        }
-                                                        CommandHandlerResponse::Replica {
-                                                            message,
-                                                            cmd,
-                                                        } => {
-                                                            let _ = actor.set_op(cmd).await;
-                                                            for resp in message {
-                                                                stream
-                                                                    .write()
-                                                                    .unwrap()
-                                                                    .write_all(&resp)
-                                                                    .unwrap();
-                                                            }
-                                                        }
-                                                    }
+                                                    command_handler_callback(
+                                                        resps,
+                                                        stream.clone(),
+                                                        &actor,
+                                                    )
+                                                    .await;
                                                 }
                                             }
                                         } else {
@@ -113,27 +98,8 @@ pub async fn handle_connection(
                                     } else if let Ok(resps) =
                                         command_handler(stream.clone(), db, resp)
                                     {
-                                        match resps {
-                                            CommandHandlerResponse::Basic(resps) => {
-                                                for resp in resps {
-                                                    stream
-                                                        .write()
-                                                        .unwrap()
-                                                        .write_all(&resp)
-                                                        .unwrap();
-                                                }
-                                            }
-                                            CommandHandlerResponse::Replica { message, cmd } => {
-                                                let _ = actor.set_op(cmd).await;
-                                                for resp in message {
-                                                    stream
-                                                        .write()
-                                                        .unwrap()
-                                                        .write_all(&resp)
-                                                        .unwrap();
-                                                }
-                                            }
-                                        }
+                                        command_handler_callback(resps, stream.clone(), &actor)
+                                            .await;
                                     }
 
                                     // next cmd is a new RespMessage
@@ -160,6 +126,26 @@ pub async fn handle_connection(
             }
             Err(_) => {
                 continue;
+            }
+        }
+    }
+}
+
+async fn command_handler_callback(
+    resps: CommandHandlerResponse,
+    stream: Arc<Mutex<TcpStream>>,
+    actor: &ReplicatorHandle,
+) {
+    match resps {
+        CommandHandlerResponse::Basic(resps) => {
+            for resp in resps {
+                stream.lock().await.write_all(&resp).await.unwrap();
+            }
+        }
+        CommandHandlerResponse::Replica { message, cmd } => {
+            let _ = actor.set_op(cmd).await;
+            for resp in message {
+                stream.lock().await.write_all(&resp).await.unwrap();
             }
         }
     }

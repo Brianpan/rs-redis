@@ -7,7 +7,9 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use store::engine::StoreEngine;
 
+use tokio::sync::Mutex;
 use tokio::{net::TcpListener, spawn};
+
 const PROGRAM_NAME: &str = "rs-redis";
 const VERSION: &str = "0.1.0";
 const DEFAULT_PORT: &str = "6379";
@@ -65,8 +67,8 @@ async fn main() -> std::io::Result<()> {
 
     while let Ok((socket, addr)) = listener.accept().await {
         let cdb = db.clone();
-        let std_stream = socket.into_std()?;
-        let stream = Arc::new(RwLock::new(std_stream));
+        // let std_stream = socket.into_std()?;
+        let stream = Arc::new(Mutex::new(socket));
         println!("New accept from: {}", addr.clone());
         tokio::spawn(async move { handle_connection(&cdb, stream, addr).await });
     }

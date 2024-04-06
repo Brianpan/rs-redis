@@ -23,11 +23,11 @@ impl ReplicatorActor {
         ReplicatorActor { db, receiver }
     }
 
-    pub fn handle(&mut self, msg: ReplicatorActorMessage) {
+    pub async fn handle(&mut self, msg: ReplicatorActorMessage) {
         match msg {
             ReplicatorActorMessage::SetOp { cmd, respond_to } => {
                 println!("replicator received command: {}", cmd);
-                let _ = self.db.sync_command(cmd);
+                let _ = self.db.sync_command(cmd).await;
                 let _ = respond_to.send(true);
             }
         }
@@ -36,7 +36,7 @@ impl ReplicatorActor {
 
 async fn run_replicator(mut actor: ReplicatorActor) {
     while let Some(msg) = actor.receiver.recv().await {
-        actor.handle(msg);
+        actor.handle(msg).await;
     }
 }
 
