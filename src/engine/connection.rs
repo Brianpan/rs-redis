@@ -20,7 +20,8 @@ pub async fn handle_connection(
     let mut buf = [0; 512];
     let mut maybe_split = false;
 
-    let addr = addr.ip().to_string();
+    let addr = addr.to_string();
+    // println!("New connection from: {}", addr.clone());
 
     // stack to handle nested commands
     let mut cmd_stack: VecDeque<Arc<RwLock<RespMessage>>> = VecDeque::new();
