@@ -7,7 +7,6 @@ use crate::store::replicator::ReplicatorHandle;
 use std::collections::VecDeque;
 use std::sync::{Arc, RwLock};
 
-use std::io::prelude::*;
 use std::net::SocketAddr;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
@@ -78,11 +77,7 @@ pub async fn handle_connection(
                                             // move the array type out of the stack
                                             parent.write().unwrap().state = RespParsingState::End;
                                             if cmd_stack.is_empty() {
-                                                let resp = command_handler(
-                                                    stream.clone(),
-                                                    db,
-                                                    parent.clone(),
-                                                );
+                                                let resp = command_handler(db, parent.clone());
                                                 if let Ok(resps) = resp {
                                                     command_handler_callback(
                                                         db.clone(),
@@ -96,9 +91,7 @@ pub async fn handle_connection(
                                         } else {
                                             cmd_stack.push_back(parent);
                                         }
-                                    } else if let Ok(resps) =
-                                        command_handler(stream.clone(), db, resp)
-                                    {
+                                    } else if let Ok(resps) = command_handler(db, resp) {
                                         command_handler_callback(
                                             db.clone(),
                                             resps,
@@ -151,7 +144,7 @@ async fn command_handler_callback(
         }
         CommandHandlerResponse::Psync { message, host } => {
             // we need to store stream to replicas
-            db.set_replicas(host, stream.clone());
+            db.set_replicas(host, stream.clone()).await;
 
             for resp in message {
                 stream.lock().await.write_all(&resp).await.unwrap();

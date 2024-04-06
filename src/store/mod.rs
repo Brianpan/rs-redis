@@ -3,10 +3,6 @@ pub mod master_engine;
 pub mod replicator;
 
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-
-use tokio::net::TcpStream;
-use tokio::sync;
 
 const MYID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 
@@ -27,14 +23,14 @@ pub enum ReplicaType {
 pub struct NodeInfo {
     port: String,
 }
-
+#[allow(dead_code)]
 pub struct MasterInfo {
     master_replid: String,
     master_repl_offset: u64,
     pub handshake_state: HandshakeState,
     slave_list: HashMap<String, SlaveInfo>,
 }
-
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct SlaveInfo {
     host: String,

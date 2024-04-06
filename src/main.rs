@@ -4,7 +4,6 @@ mod store;
 use clap::{Arg, Command};
 use engine::connection::handle_connection;
 use std::sync::Arc;
-use std::sync::RwLock;
 use store::engine::StoreEngine;
 
 use tokio::sync::Mutex;

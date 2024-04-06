@@ -10,8 +10,6 @@ use crate::store::master_engine::MasterEngine;
 use crate::store::{HandshakeState, ReplicaType};
 
 use anyhow::Result;
-use tokio::net::TcpStream;
-use tokio::sync::Mutex;
 
 pub fn handle_info(
     db: &Arc<StoreEngine>,

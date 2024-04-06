@@ -2,7 +2,7 @@ use super::engine::StoreEngine;
 use super::{HandshakeState, ReplicaType, SlaveInfo};
 use crate::engine::array_to_resp_array;
 // use std::io::prelude::*;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
@@ -19,8 +19,15 @@ pub trait MasterEngine {
 
     fn should_sync_command(&self) -> bool;
 
-    async fn set_replicas(&self, host: String, stream: Arc<Mutex<TcpStream>>);
-    async fn sync_command(&self, cmd: String) -> anyhow::Result<()>;
+    fn set_replicas(
+        &self,
+        host: String,
+        stream: Arc<Mutex<TcpStream>>,
+    ) -> impl std::future::Future<Output = ()> + Send;
+    fn sync_command(
+        &self,
+        cmd: String,
+    ) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
 }
 
 impl MasterEngine for StoreEngine {
@@ -101,7 +108,7 @@ impl MasterEngine for StoreEngine {
                 let cmd = array_to_resp_array(cmd_vec1);
                 if let Some(stream) = self.replicas.read().await.get(&host.clone()) {
                     let mut stream = stream.lock().await;
-                    stream.write_all(&cmd.as_bytes()).await;
+                    let _ = stream.write_all(&cmd.as_bytes()).await;
                 }
 
                 // self.master_info
