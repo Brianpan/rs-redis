@@ -144,6 +144,7 @@ async fn command_handler_callback(
         }
         CommandHandlerResponse::Psync { message, host } => {
             // we need to store stream to replicas
+            println!("set replica: {}", host.clone());
             db.set_replicas(host, stream.clone()).await;
 
             for resp in message {
