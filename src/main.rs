@@ -67,6 +67,7 @@ async fn main() -> std::io::Result<()> {
         let cdb = db.clone();
         let std_stream = socket.into_std()?;
         let stream = Arc::new(RwLock::new(std_stream));
+        println!("New accept from: {}", addr.clone());
         tokio::spawn(async move { handle_connection(&cdb, stream, addr).await });
     }
 
