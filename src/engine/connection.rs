@@ -33,6 +33,7 @@ pub async fn handle_connection(
     let actor = ReplicatorHandle::new(db.clone());
     // tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
+    println!("New connection from: {}", addr.clone());
     loop {
         // let _ = stream.read().unwrap().readable();
         let chrs = stream.write().unwrap().read(&mut buf);
