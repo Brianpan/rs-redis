@@ -117,17 +117,6 @@ impl MasterEngine for StoreEngine {
                         }
                     }
                 }
-
-                // self.master_info
-                //     .read()
-                //     .unwrap()
-                //     .replicas
-                //     .get(&host.clone())
-                //     .unwrap()
-                //     .lock()
-                //     .await
-                //     .write_all(&cmd.as_bytes())
-                //     .await;
                 println!("TBD sync");
             }
         }

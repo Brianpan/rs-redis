@@ -232,15 +232,15 @@ impl StoreEngine {
             }
 
             //     // read rdb file
-            //     match reader.read(&mut buf).await {
-            //         Ok(buf_len) => {
-            //             let rdb = String::from_utf8_lossy(buf[..buf_len].as_ref());
-            //             println!("rdb: {}", rdb);
-            //         }
-            //         Err(e) => {
-            //             return Err(anyhow::Error::new(e));
-            //         }
-            //     }
+            match reader.read(&mut buf).await {
+                Ok(buf_len) => {
+                    let rdb = String::from_utf8_lossy(buf[..buf_len].as_ref());
+                    println!("rdb: {}", rdb);
+                }
+                Err(e) => {
+                    return Err(anyhow::Error::new(e));
+                }
+            }
         }
 
         Ok(())
