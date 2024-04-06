@@ -212,35 +212,35 @@ impl StoreEngine {
                     // will use nom parser to write RESP protocol parser in the future
                     // +FULLRESYNC <REPL_ID> 0\r\n
                     // simple string format so it's easier for us to parse
-                    let mut next_is_masterid = false;
-                    while let Some(word) = resp.split_whitespace().next() {
-                        if word == FULLRESYNC {
-                            next_is_masterid = true;
-                            continue;
-                        } else if next_is_masterid {
-                            (*self.slave_info.write().unwrap()).master_replid =
-                                word.to_string().clone();
 
-                            break;
-                        }
-                    }
+                    // let mut next_is_masterid = false;
+                    // while let Some(word) = resp.split_whitespace().next() {
+                    //     if word == FULLRESYNC {
+                    //         next_is_masterid = true;
+                    //         continue;
+                    //     } else if next_is_masterid {
+                    //         (*self.slave_info.write().unwrap()).master_replid =
+                    //             word.to_string().clone();
+
+                    //         break;
+                    //     }
+                    // }
                 }
                 Err(e) => {
                     return Err(anyhow::Error::new(e));
                 }
             }
-            // stream.read(&mut buf)?;
 
-            // read rdb file
-            match reader.read(&mut buf).await {
-                Ok(buf_len) => {
-                    let rdb = String::from_utf8_lossy(buf[..buf_len].as_ref());
-                    println!("rdb: {}", rdb);
-                }
-                Err(e) => {
-                    return Err(anyhow::Error::new(e));
-                }
-            }
+            //     // read rdb file
+            //     match reader.read(&mut buf).await {
+            //         Ok(buf_len) => {
+            //             let rdb = String::from_utf8_lossy(buf[..buf_len].as_ref());
+            //             println!("rdb: {}", rdb);
+            //         }
+            //         Err(e) => {
+            //             return Err(anyhow::Error::new(e));
+            //         }
+            //     }
         }
 
         Ok(())

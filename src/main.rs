@@ -64,6 +64,8 @@ async fn main() -> std::io::Result<()> {
         reaper_db.expired_reaper().await;
     });
 
+    println!("start accept");
+
     while let Ok((socket, addr)) = listener.accept().await {
         let cdb = db.clone();
         // let std_stream = socket.into_std()?;
