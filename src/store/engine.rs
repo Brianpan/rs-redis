@@ -4,9 +4,10 @@ use priority_queue::PriorityQueue;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::io::prelude::*;
-use std::net::TcpStream;
 use std::sync::RwLock;
 use std::time::*;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
+use tokio::net::TcpStream;
 
 // https://github.com/tokio-rs/tokio/blob/master/examples/tinydb.rs
 
@@ -118,7 +119,11 @@ impl StoreEngine {
 
     pub async fn handshake_to_master(&self) -> anyhow::Result<()> {
         if let ReplicaType::Slave(master) = self.get_replica() {
-            let mut stream = TcpStream::connect(master)?;
+            let mut stream = TcpStream::connect(master).await?;
+
+            let (mut rx, mut tx) = stream.split();
+            let mut reader = BufReader::new(rx);
+            let mut writer = BufWriter::new(tx);
 
             let redis_port = self.node_info.read().unwrap().port.clone();
 
@@ -146,10 +151,14 @@ impl StoreEngine {
                 "-1".to_string(),
             ]);
             let mut buf = [0; 1024];
-            stream.write(ping_cmd.as_bytes())?;
-            match stream.read(&mut buf) {
+            writer.write(ping_cmd.as_bytes()).await?;
+            writer.flush().await?;
+            println!("ping sent to master");
+
+            match reader.read(&mut buf).await {
                 Ok(buf_len) => {
                     let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
+                    println!("ping response: {}", resp);
                     if !resp.contains("+PONG") {
                         return Err(anyhow::anyhow!("Handshake PING failed"));
                     }
@@ -159,8 +168,9 @@ impl StoreEngine {
                 }
             }
 
-            stream.write(replconf_cmd.as_bytes())?;
-            match stream.read(&mut buf) {
+            writer.write(replconf_cmd.as_bytes()).await?;
+            writer.flush().await?;
+            match reader.read(&mut buf).await {
                 Ok(buf_len) => {
                     let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
                     if !resp.contains("+OK") {
@@ -171,8 +181,9 @@ impl StoreEngine {
                     return Err(anyhow::Error::new(e));
                 }
             }
-            stream.write(replconf_capa_cmd.as_bytes())?;
-            match stream.read(&mut buf) {
+            writer.write(replconf_capa_cmd.as_bytes()).await?;
+            writer.flush().await?;
+            match reader.read(&mut buf).await {
                 Ok(buf_len) => {
                     let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
                     if !resp.contains("+OK") {
@@ -184,8 +195,9 @@ impl StoreEngine {
                 }
             }
 
-            stream.write(psync_cmd.as_bytes())?;
-            match stream.read(&mut buf) {
+            writer.write(psync_cmd.as_bytes()).await?;
+            writer.flush().await?;
+            match reader.read(&mut buf).await {
                 Ok(buf_len) => {
                     let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
                     if !resp.contains(FULLRESYNC) {
@@ -216,7 +228,7 @@ impl StoreEngine {
             // stream.read(&mut buf)?;
 
             // read rdb file
-            match stream.read(&mut buf) {
+            match reader.read(&mut buf).await {
                 Ok(buf_len) => {
                     let rdb = String::from_utf8_lossy(buf[..buf_len].as_ref());
                     println!("rdb: {}", rdb);
