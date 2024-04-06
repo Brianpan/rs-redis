@@ -145,7 +145,7 @@ pub fn command_handler(
                         // replconf always return OK
                         COMMAND_REPLCONF => handle_replica(&db.clone(), cmd.clone()),
                         // psync return from master node with fullresync and myid
-                        COMMAND_PSYNC => handle_psync(&db.clone(), arc_stream.clone(), cmd.clone()),
+                        COMMAND_PSYNC => handle_psync(&db.clone(), cmd.clone()),
                         _ => {
                             resp_vec.push(RESP_EMPTY.to_string().as_bytes().to_vec());
                             Ok(CommandHandlerResponse::Basic(resp_vec))

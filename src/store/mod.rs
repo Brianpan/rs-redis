@@ -33,7 +33,6 @@ pub struct MasterInfo {
     master_repl_offset: u64,
     pub handshake_state: HandshakeState,
     slave_list: HashMap<String, SlaveInfo>,
-    replicas: HashMap<String, Arc<sync::Mutex<TcpStream>>>,
 }
 
 #[derive(Clone)]
@@ -60,7 +59,6 @@ impl Default for MasterInfo {
             master_repl_offset: 0,
             handshake_state: HandshakeState::Ping,
             slave_list: HashMap::new(),
-            replicas: HashMap::new(),
         }
     }
 }

@@ -66,7 +66,6 @@ pub fn handle_info(
 
 pub fn handle_psync(
     db: &Arc<StoreEngine>,
-    stream: Arc<Mutex<TcpStream>>,
     cmd: Arc<RwLock<RespMessage>>,
 ) -> Result<CommandHandlerResponse> {
     let myid = db.get_master_id();
@@ -84,11 +83,11 @@ pub fn handle_psync(
     // no stream port needed
     db.set_slave_node(host.clone(), String::from(""), HandshakeState::Psync);
 
-    // we need to store stream to replicas
-    db.set_replicas(host.clone(), stream.clone());
-
     resp_vec.push(rdb_vec);
-    Ok(CommandHandlerResponse::Basic(resp_vec))
+    Ok(CommandHandlerResponse::Psync {
+        message: resp_vec,
+        host: host,
+    })
 }
 
 pub fn handle_replica(

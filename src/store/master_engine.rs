@@ -17,9 +17,9 @@ pub trait MasterEngine {
     fn set_slave_node(&self, _host: String, stream_port: String, _handshake_state: HandshakeState);
     fn get_slave_node(&self, host: String) -> Option<SlaveInfo>;
 
-    fn set_replicas(&self, host: String, stream: Arc<Mutex<TcpStream>>);
-
     fn should_sync_command(&self) -> bool;
+
+    async fn set_replicas(&self, host: String, stream: Arc<Mutex<TcpStream>>);
     async fn sync_command(&self, cmd: String) -> anyhow::Result<()>;
 }
 
@@ -63,14 +63,6 @@ impl MasterEngine for StoreEngine {
             .insert(host.clone(), slave);
     }
 
-    fn set_replicas(&self, host: String, stream: Arc<Mutex<TcpStream>>) {
-        self.master_info
-            .write()
-            .unwrap()
-            .replicas
-            .insert(host.clone(), stream.clone());
-    }
-
     fn get_slave_node(&self, host: String) -> Option<SlaveInfo> {
         self.master_info
             .read()
@@ -82,6 +74,13 @@ impl MasterEngine for StoreEngine {
 
     fn should_sync_command(&self) -> bool {
         self.is_master() && self.master_info.read().unwrap().slave_list.len() > 0
+    }
+
+    async fn set_replicas(&self, host: String, stream: Arc<Mutex<TcpStream>>) {
+        self.replicas
+            .write()
+            .await
+            .insert(host.clone(), stream.clone());
     }
 
     async fn sync_command(&self, cmd: String) -> anyhow::Result<()> {
@@ -100,10 +99,10 @@ impl MasterEngine for StoreEngine {
             if slave.handshake_state == HandshakeState::Psync {
                 // send command to slave
                 let cmd = array_to_resp_array(cmd_vec1);
-                // if let Some(stream) = self.master_info.read().unwrap().replicas.get(&host.clone()) {
-                // let mut stream = stream.lock().await;
-                // stream.write_all(&cmd.as_bytes()).await;
-                // }
+                if let Some(stream) = self.replicas.read().await.get(&host.clone()) {
+                    let mut stream = stream.lock().await;
+                    stream.write_all(&cmd.as_bytes()).await;
+                }
 
                 // self.master_info
                 //     .read()

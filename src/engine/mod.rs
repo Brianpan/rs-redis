@@ -34,6 +34,7 @@ pub enum RespType {
 
 pub enum CommandHandlerResponse {
     Basic(Vec<Vec<u8>>),
+    Psync { message: Vec<Vec<u8>>, host: String },
     Replica { message: Vec<Vec<u8>>, cmd: String },
 }
 

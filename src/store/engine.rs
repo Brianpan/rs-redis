@@ -4,6 +4,7 @@ use priority_queue::PriorityQueue;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 // use std::io::prelude::*;
+use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::*;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
@@ -21,6 +22,7 @@ pub struct StoreEngine {
     pub replica_info: RwLock<ReplicaType>,
     pub master_info: RwLock<MasterInfo>,
     pub slave_info: RwLock<SlaveInfo>,
+    pub replicas: sync::RwLock<HashMap<String, Arc<sync::Mutex<TcpStream>>>>,
 }
 
 impl StoreEngine {
@@ -32,6 +34,7 @@ impl StoreEngine {
             node_info: RwLock::new(NodeInfo::default()),
             master_info: RwLock::new(MasterInfo::default()),
             slave_info: RwLock::new(SlaveInfo::default()),
+            replicas: sync::RwLock::new(HashMap::new()),
         }
     }
 

@@ -1,11 +1,11 @@
-use std::collections::VecDeque;
-use std::sync::{Arc, RwLock};
-
 use super::commands::command_handler;
 use super::{RespMessage, RespParsingState, RespType};
 use crate::engine::CommandHandlerResponse;
 use crate::store::engine::StoreEngine;
+use crate::store::master_engine::MasterEngine;
 use crate::store::replicator::ReplicatorHandle;
+use std::collections::VecDeque;
+use std::sync::{Arc, RwLock};
 
 use std::io::prelude::*;
 use std::net::SocketAddr;
@@ -85,6 +85,7 @@ pub async fn handle_connection(
                                                 );
                                                 if let Ok(resps) = resp {
                                                     command_handler_callback(
+                                                        db.clone(),
                                                         resps,
                                                         stream.clone(),
                                                         &actor,
@@ -98,8 +99,13 @@ pub async fn handle_connection(
                                     } else if let Ok(resps) =
                                         command_handler(stream.clone(), db, resp)
                                     {
-                                        command_handler_callback(resps, stream.clone(), &actor)
-                                            .await;
+                                        command_handler_callback(
+                                            db.clone(),
+                                            resps,
+                                            stream.clone(),
+                                            &actor,
+                                        )
+                                        .await;
                                     }
 
                                     // next cmd is a new RespMessage
@@ -132,6 +138,7 @@ pub async fn handle_connection(
 }
 
 async fn command_handler_callback(
+    db: Arc<StoreEngine>,
     resps: CommandHandlerResponse,
     stream: Arc<Mutex<TcpStream>>,
     actor: &ReplicatorHandle,
@@ -139,6 +146,14 @@ async fn command_handler_callback(
     match resps {
         CommandHandlerResponse::Basic(resps) => {
             for resp in resps {
+                stream.lock().await.write_all(&resp).await.unwrap();
+            }
+        }
+        CommandHandlerResponse::Psync { message, host } => {
+            // we need to store stream to replicas
+            db.set_replicas(host, stream.clone());
+
+            for resp in message {
                 stream.lock().await.write_all(&resp).await.unwrap();
             }
         }
