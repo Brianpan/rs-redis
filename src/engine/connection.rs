@@ -1,10 +1,10 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, RwLock};
 
-use crate::store::engine::StoreEngine;
-
 use super::commands::command_handler;
 use super::{RespMessage, RespParsingState, RespType};
+use crate::store::engine::StoreEngine;
+use crate::store::replicator::ReplicatorHandle;
 
 use std::io::prelude::*;
 use std::net::SocketAddr;
@@ -27,6 +27,8 @@ pub async fn handle_connection(
     // push the first element
     // this cmd stack is used to track nested commands specifically for array type
     cmd_stack.push_back(Arc::new(RwLock::new(RespMessage::new(addr.clone()))));
+
+    let actor = ReplicatorHandle::new();
 
     loop {
         // let _ = stream.read().unwrap().readable();
@@ -71,6 +73,7 @@ pub async fn handle_connection(
                                             if cmd_stack.is_empty() {
                                                 let resp = command_handler(
                                                     stream.clone(),
+                                                    &actor,
                                                     db,
                                                     parent.clone(),
                                                 );
@@ -89,7 +92,7 @@ pub async fn handle_connection(
                                             cmd_stack.push_back(parent);
                                         }
                                     } else if let Ok(resps) =
-                                        command_handler(stream.clone(), db, resp)
+                                        command_handler(stream.clone(), &actor, db, resp)
                                     {
                                         for resp in resps {
                                             stream.write().unwrap().write_all(&resp).unwrap();

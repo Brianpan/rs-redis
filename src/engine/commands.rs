@@ -6,6 +6,7 @@ use super::{RespMessage, RespType, RESP_EMPTY, RESP_ERR, RESP_OK, RESP_PONG};
 use super::string_to_bulk_string;
 use crate::store::engine::StoreEngine;
 use crate::store::master_engine::MasterEngine;
+use crate::store::replicator::ReplicatorHandle;
 use anyhow::Result;
 use std::net::TcpStream;
 
@@ -21,6 +22,7 @@ const COMMAND_PSYNC: &str = "psync";
 // we support multiple responses to handle commands like psync
 pub fn command_handler(
     arc_stream: Arc<RwLock<TcpStream>>,
+    actor_handle: &ReplicatorHandle,
     db: &Arc<StoreEngine>,
     cmd: Arc<RwLock<RespMessage>>,
 ) -> Result<Vec<Vec<u8>>> {
@@ -104,9 +106,11 @@ pub fn command_handler(
                                     .unwrap();
                                 db.set_with_expire(key.clone(), val.clone(), ttl);
                                 let _ = db.sync_command(format!("SET {} {} {}", key, val, ttl));
+                                let _ = actor_handle.set_op(format!("SET {} {} {}", key, val, ttl));
                             } else {
                                 db.set(key.clone(), val.clone());
                                 let _ = db.sync_command(format!("SET {} {}", key, val));
+                                let _ = actor_handle.set_op(format!("SET {} {}", key, val));
                             }
 
                             resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());
