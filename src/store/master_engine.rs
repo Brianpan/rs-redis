@@ -110,7 +110,12 @@ impl MasterEngine for StoreEngine {
                 if let Some(stream) = self.replicas.read().await.get(&host.clone()) {
                     println!("syncing command to slave2: {} {}", host, cmd.clone());
                     let mut stream = stream.lock().await;
-                    let _ = stream.write_all(&cmd.as_bytes()).await;
+                    match stream.write_all(&cmd.as_bytes()).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            println!("err: {}", e);
+                        }
+                    }
                 }
 
                 // self.master_info
