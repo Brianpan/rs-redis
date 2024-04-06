@@ -31,6 +31,12 @@ pub enum RespType {
     BulkString,
     Array,
 }
+
+pub enum CommandHandlerResponse {
+    Basic(Vec<Vec<u8>>),
+    Replica { message: Vec<Vec<u8>>, cmd: String },
+}
+
 #[derive(PartialEq, Clone)]
 pub struct RespMessage {
     pub remote_addr: String,

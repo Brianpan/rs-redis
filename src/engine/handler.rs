@@ -1,7 +1,8 @@
 use std::sync::{Arc, RwLock};
 
 use super::{
-    string_to_bulk_string, string_to_bulk_string_for_psync, RespMessage, EMPTY_RDB, MYID, RESP_OK,
+    string_to_bulk_string, string_to_bulk_string_for_psync, CommandHandlerResponse, RespMessage,
+    EMPTY_RDB, MYID, RESP_OK,
 };
 
 use crate::store::engine::StoreEngine;
@@ -11,13 +12,16 @@ use crate::store::{HandshakeState, ReplicaType};
 use anyhow::Result;
 use std::net::TcpStream;
 
-pub fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Result<Vec<Vec<u8>>> {
+pub fn handle_info(
+    db: &Arc<StoreEngine>,
+    cmd: Arc<RwLock<RespMessage>>,
+) -> Result<CommandHandlerResponse> {
     let mut lookup_keys: Vec<String> = Vec::new();
     for i in 1..cmd.read().unwrap().vec_data.len() {
         lookup_keys.push(cmd.read().unwrap().vec_data[i as usize].str_data.clone());
     }
 
-    let mut ret_vec = Vec::new();
+    let mut resp_vec = Vec::new();
     let mut ret = String::new();
 
     if lookup_keys.is_empty() {
@@ -55,21 +59,21 @@ pub fn handle_info(db: &Arc<StoreEngine>, cmd: Arc<RwLock<RespMessage>>) -> Resu
         }
     }
 
-    ret_vec.push(ret.as_bytes().to_vec());
-    Ok(ret_vec)
+    resp_vec.push(ret.as_bytes().to_vec());
+    Ok(CommandHandlerResponse::Basic(resp_vec))
 }
 
 pub fn handle_psync(
     db: &Arc<StoreEngine>,
     stream: Arc<RwLock<TcpStream>>,
     cmd: Arc<RwLock<RespMessage>>,
-) -> Result<Vec<Vec<u8>>> {
+) -> Result<CommandHandlerResponse> {
     let myid = db.get_master_id();
 
     // stage 1: return +FULLRESYNC and myid
     let ret = format!("+FULLRESYNC {} 0\r\n", myid);
-    let mut ret_vec = Vec::new();
-    ret_vec.push(ret.as_bytes().to_vec());
+    let mut resp_vec = Vec::new();
+    resp_vec.push(ret.as_bytes().to_vec());
     let rdb_snapshot = hex::decode(EMPTY_RDB).unwrap();
     let mut rdb_vec: Vec<u8> = string_to_bulk_string_for_psync(EMPTY_RDB.to_string()).into();
     rdb_vec.extend(&rdb_snapshot);
@@ -82,14 +86,14 @@ pub fn handle_psync(
     // we need to store stream to replicas
     db.set_replicas(host.clone(), stream.clone());
 
-    ret_vec.push(rdb_vec);
-    Ok(ret_vec)
+    resp_vec.push(rdb_vec);
+    Ok(CommandHandlerResponse::Basic(resp_vec))
 }
 
 pub fn handle_replica(
     db: &Arc<StoreEngine>,
     cmd: Arc<RwLock<RespMessage>>,
-) -> Result<Vec<Vec<u8>>> {
+) -> Result<CommandHandlerResponse> {
     let mut resp_vec = Vec::new();
 
     if cmd.read().unwrap().vec_data.len() > 2 {
@@ -114,5 +118,5 @@ pub fn handle_replica(
     let ret = RESP_OK;
     resp_vec.push(ret.to_string().as_bytes().to_vec());
 
-    Ok(resp_vec)
+    Ok(CommandHandlerResponse::Basic(resp_vec))
 }

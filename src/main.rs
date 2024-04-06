@@ -6,6 +6,7 @@ use engine::connection::handle_connection;
 use std::sync::Arc;
 use std::sync::RwLock;
 use store::engine::StoreEngine;
+
 use tokio::{net::TcpListener, spawn};
 const PROGRAM_NAME: &str = "rs-redis";
 const VERSION: &str = "0.1.0";
@@ -61,15 +62,6 @@ async fn main() -> std::io::Result<()> {
     spawn(async move {
         reaper_db.expired_reaper().await;
     });
-
-    // loop {
-    //     let cdb = db.clone();
-    //     let (socket, addr) = listener.accept().await.unwrap();
-
-    //     tokio::spawn(async move {
-    //         handle_connection(&cdb, socket, addr).await;
-    //     });
-    // }
 
     while let Ok((socket, addr)) = listener.accept().await {
         let cdb = db.clone();

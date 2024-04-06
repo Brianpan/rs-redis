@@ -3,6 +3,7 @@ use std::sync::{Arc, RwLock};
 
 use super::commands::command_handler;
 use super::{RespMessage, RespParsingState, RespType};
+use crate::engine::CommandHandlerResponse;
 use crate::store::engine::StoreEngine;
 use crate::store::replicator::ReplicatorHandle;
 
@@ -29,6 +30,8 @@ pub async fn handle_connection(
     cmd_stack.push_back(Arc::new(RwLock::new(RespMessage::new(addr.clone()))));
 
     let actor = ReplicatorHandle::new();
+    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+    println!("after actor in handle_connection");
 
     loop {
         // let _ = stream.read().unwrap().readable();
@@ -73,18 +76,33 @@ pub async fn handle_connection(
                                             if cmd_stack.is_empty() {
                                                 let resp = command_handler(
                                                     stream.clone(),
-                                                    &actor,
                                                     db,
                                                     parent.clone(),
                                                 );
-
                                                 if let Ok(resps) = resp {
-                                                    for resp in resps {
-                                                        stream
-                                                            .write()
-                                                            .unwrap()
-                                                            .write_all(&resp)
-                                                            .unwrap();
+                                                    match resps {
+                                                        CommandHandlerResponse::Basic(resps) => {
+                                                            for resp in resps {
+                                                                stream
+                                                                    .write()
+                                                                    .unwrap()
+                                                                    .write_all(&resp)
+                                                                    .unwrap();
+                                                            }
+                                                        }
+                                                        CommandHandlerResponse::Replica {
+                                                            message,
+                                                            cmd,
+                                                        } => {
+                                                            let _ = actor.set_op(cmd).await;
+                                                            for resp in message {
+                                                                stream
+                                                                    .write()
+                                                                    .unwrap()
+                                                                    .write_all(&resp)
+                                                                    .unwrap();
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -92,10 +110,28 @@ pub async fn handle_connection(
                                             cmd_stack.push_back(parent);
                                         }
                                     } else if let Ok(resps) =
-                                        command_handler(stream.clone(), &actor, db, resp)
+                                        command_handler(stream.clone(), db, resp)
                                     {
-                                        for resp in resps {
-                                            stream.write().unwrap().write_all(&resp).unwrap();
+                                        match resps {
+                                            CommandHandlerResponse::Basic(resps) => {
+                                                for resp in resps {
+                                                    stream
+                                                        .write()
+                                                        .unwrap()
+                                                        .write_all(&resp)
+                                                        .unwrap();
+                                                }
+                                            }
+                                            CommandHandlerResponse::Replica { message, cmd } => {
+                                                let _ = actor.set_op(cmd).await;
+                                                for resp in message {
+                                                    stream
+                                                        .write()
+                                                        .unwrap()
+                                                        .write_all(&resp)
+                                                        .unwrap();
+                                                }
+                                            }
                                         }
                                     }
 

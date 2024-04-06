@@ -1,12 +1,13 @@
 use std::sync::{Arc, RwLock};
 
 use super::handler::{handle_info, handle_psync, handle_replica};
-use super::{RespMessage, RespType, RESP_EMPTY, RESP_ERR, RESP_OK, RESP_PONG};
+use super::{
+    CommandHandlerResponse, RespMessage, RespType, RESP_EMPTY, RESP_ERR, RESP_OK, RESP_PONG,
+};
 
 use super::string_to_bulk_string;
 use crate::store::engine::StoreEngine;
 use crate::store::master_engine::MasterEngine;
-use crate::store::replicator::ReplicatorHandle;
 use anyhow::Result;
 use std::net::TcpStream;
 
@@ -22,19 +23,18 @@ const COMMAND_PSYNC: &str = "psync";
 // we support multiple responses to handle commands like psync
 pub fn command_handler(
     arc_stream: Arc<RwLock<TcpStream>>,
-    actor_handle: &ReplicatorHandle,
     db: &Arc<StoreEngine>,
     cmd: Arc<RwLock<RespMessage>>,
-) -> Result<Vec<Vec<u8>>> {
+) -> Result<CommandHandlerResponse> {
     let mut resp_vec = Vec::new();
     let ret = match cmd.read().unwrap().resp_type {
         RespType::SimpleString => {
             resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());
-            Ok(resp_vec)
+            Ok(CommandHandlerResponse::Basic(resp_vec))
         }
         RespType::Error => {
             resp_vec.push(RESP_ERR.to_string().as_bytes().to_vec());
-            Ok(resp_vec)
+            Ok(CommandHandlerResponse::Basic(resp_vec))
         }
         RespType::Integer => {
             resp_vec.push(
@@ -42,7 +42,7 @@ pub fn command_handler(
                     .as_bytes()
                     .to_vec(),
             );
-            Ok(resp_vec)
+            Ok(CommandHandlerResponse::Basic(resp_vec))
         }
         RespType::BulkString => {
             match cmd
@@ -55,7 +55,7 @@ pub fn command_handler(
             {
                 "ping" => {
                     resp_vec.push(RESP_PONG.to_string().as_bytes().to_vec());
-                    Ok(resp_vec)
+                    Ok(CommandHandlerResponse::Basic(resp_vec))
                 }
                 _ => return Err(anyhow::anyhow!("Unknown command")),
             }
@@ -71,7 +71,7 @@ pub fn command_handler(
                     {
                         "" => {
                             resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());
-                            Ok(resp_vec)
+                            Ok(CommandHandlerResponse::Basic(resp_vec))
                         }
                         COMMAND_GET => {
                             let key = cmd.read().unwrap().vec_data[1].str_data.clone();
@@ -83,7 +83,7 @@ pub fn command_handler(
                                     resp_vec.push("$-1\r\n".to_string().as_bytes().to_vec());
                                 }
                             }
-                            Ok(resp_vec)
+                            Ok(CommandHandlerResponse::Basic(resp_vec))
                         }
                         COMMAND_SET => {
                             let db = db.clone();
@@ -97,6 +97,8 @@ pub fn command_handler(
                             let val = cmd.read().unwrap().vec_data[2].str_data.clone();
                             let cmd_len = cmd.read().unwrap().vec_data.len();
 
+                            let mut repl_command = format!("SET {} {}", key.clone(), val.clone());
+
                             if cmd_len == 5
                                 && cmd.read().unwrap().vec_data[3].str_data.to_lowercase() == "px"
                             {
@@ -105,20 +107,34 @@ pub fn command_handler(
                                     .parse::<u128>()
                                     .unwrap();
                                 db.set_with_expire(key.clone(), val.clone(), ttl);
-                                let _ = db.sync_command(format!("SET {} {} {}", key, val, ttl));
-                                let _ = actor_handle.set_op(format!("SET {} {} {}", key, val, ttl));
+                                let _ = db.sync_command(format!(
+                                    "SET {} {} {}",
+                                    key.clone(),
+                                    val.clone(),
+                                    ttl.clone()
+                                ));
+
+                                repl_command.push_str(format!(" {}", ttl.clone()).as_str());
                             } else {
                                 db.set(key.clone(), val.clone());
-                                let _ = db.sync_command(format!("SET {} {}", key, val));
-                                let _ = actor_handle.set_op(format!("SET {} {}", key, val));
+                                let _ =
+                                    db.sync_command(format!("SET {} {}", key.clone(), val.clone()));
                             }
 
                             resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());
-                            Ok(resp_vec)
+
+                            if db.should_sync_command() || true {
+                                Ok(CommandHandlerResponse::Replica {
+                                    message: resp_vec,
+                                    cmd: repl_command,
+                                })
+                            } else {
+                                Ok(CommandHandlerResponse::Basic(resp_vec))
+                            }
                         }
                         COMMAND_PING => {
                             resp_vec.push(RESP_PONG.to_string().as_bytes().to_vec());
-                            Ok(resp_vec)
+                            Ok(CommandHandlerResponse::Basic(resp_vec))
                         }
                         COMMAND_ECHO => {
                             let mut ret = String::new();
@@ -128,7 +144,7 @@ pub fn command_handler(
                                 ));
                             }
                             resp_vec.push(ret.as_bytes().to_vec());
-                            Ok(resp_vec)
+                            Ok(CommandHandlerResponse::Basic(resp_vec))
                         }
                         COMMAND_INFO => handle_info(&db.clone(), cmd.clone()),
                         // replconf always return OK
@@ -137,13 +153,13 @@ pub fn command_handler(
                         COMMAND_PSYNC => handle_psync(&db.clone(), arc_stream.clone(), cmd.clone()),
                         _ => {
                             resp_vec.push(RESP_EMPTY.to_string().as_bytes().to_vec());
-                            Ok(resp_vec)
+                            Ok(CommandHandlerResponse::Basic(resp_vec))
                         }
                     };
                 }
                 _ => {
                     resp_vec.push(RESP_EMPTY.to_string().as_bytes().to_vec());
-                    Ok(resp_vec)
+                    Ok(CommandHandlerResponse::Basic(resp_vec))
                 }
             }
         }
