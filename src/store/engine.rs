@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::io::prelude::*;
 use std::sync::RwLock;
 use std::time::*;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::net::TcpStream;
 
 // https://github.com/tokio-rs/tokio/blob/master/examples/tinydb.rs
@@ -121,7 +121,7 @@ impl StoreEngine {
         if let ReplicaType::Slave(master) = self.get_replica() {
             let mut stream = TcpStream::connect(master).await?;
 
-            let (mut rx, mut tx) = stream.split();
+            let (rx, tx) = stream.split();
             let mut reader = BufReader::new(rx);
             let mut writer = BufWriter::new(tx);
 
