@@ -30,7 +30,7 @@ pub async fn handle_connection(
     cmd_stack.push_back(Arc::new(RwLock::new(RespMessage::new(addr.clone()))));
 
     let actor = ReplicatorHandle::new(db.clone());
-    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+    // tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
     loop {
         // let _ = stream.read().unwrap().readable();
