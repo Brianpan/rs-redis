@@ -10,14 +10,11 @@ use std::sync::{Arc, RwLock};
 use std::net::SocketAddr;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
+use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 
-pub async fn handle_connection(
-    db: &Arc<StoreEngine>,
-    stream: Arc<Mutex<TcpStream>>,
-    addr: SocketAddr,
-) {
+pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream, addr: SocketAddr) {
     let mut cmd = String::new();
     let mut buf = [0; 512];
     let mut maybe_split = false;
@@ -32,13 +29,17 @@ pub async fn handle_connection(
     // this cmd stack is used to track nested commands specifically for array type
     cmd_stack.push_back(Arc::new(RwLock::new(RespMessage::new(addr.clone()))));
 
+    let (mut rx, tx) = stream.into_split();
+    let arc_tx = Arc::new(Mutex::new(tx));
+
     let actor = ReplicatorHandle::new(db.clone());
     // tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
     println!("New connection from: {}", addr.clone());
     loop {
-        let _ = stream.lock().await.readable();
-        let chrs = stream.lock().await.read(&mut buf).await;
+        let _ = rx.readable();
+        println!("=====================");
+        let chrs = rx.read(&mut buf).await;
         match chrs {
             Ok(n) => {
                 if n == 0 {
@@ -82,7 +83,7 @@ pub async fn handle_connection(
                                                     command_handler_callback(
                                                         db.clone(),
                                                         resps,
-                                                        stream.clone(),
+                                                        &arc_tx.clone(),
                                                         &actor,
                                                     )
                                                     .await;
@@ -95,7 +96,7 @@ pub async fn handle_connection(
                                         command_handler_callback(
                                             db.clone(),
                                             resps,
-                                            stream.clone(),
+                                            &arc_tx.clone(),
                                             &actor,
                                         )
                                         .await;
@@ -133,7 +134,7 @@ pub async fn handle_connection(
 async fn command_handler_callback(
     db: Arc<StoreEngine>,
     resps: CommandHandlerResponse,
-    stream: Arc<Mutex<TcpStream>>,
+    stream: &Arc<Mutex<OwnedWriteHalf>>,
     actor: &ReplicatorHandle,
 ) {
     match resps {

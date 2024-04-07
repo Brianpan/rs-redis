@@ -66,12 +66,12 @@ async fn main() -> std::io::Result<()> {
 
     println!("start accept");
 
-    while let Ok((socket, addr)) = listener.accept().await {
+    while let Ok((mut socket, addr)) = listener.accept().await {
         let cdb = db.clone();
         // let std_stream = socket.into_std()?;
-        let stream = Arc::new(Mutex::new(socket));
+        // let stream = Arc::new(Mutex::new(socket));
         println!("New accept from: {}", addr.clone());
-        tokio::spawn(async move { handle_connection(&cdb, stream, addr).await });
+        tokio::spawn(async move { handle_connection(&cdb, socket, addr).await });
     }
 
     Ok(())

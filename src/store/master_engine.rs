@@ -4,6 +4,7 @@ use crate::engine::array_to_resp_array;
 // use std::io::prelude::*;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
+use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 
@@ -22,7 +23,7 @@ pub trait MasterEngine {
     fn set_replicas(
         &self,
         host: String,
-        stream: Arc<Mutex<TcpStream>>,
+        stream: Arc<Mutex<OwnedWriteHalf>>,
     ) -> impl std::future::Future<Output = ()> + Send;
     fn sync_command(
         &self,
@@ -83,7 +84,7 @@ impl MasterEngine for StoreEngine {
         self.is_master() && self.master_info.read().unwrap().slave_list.len() > 0
     }
 
-    async fn set_replicas(&self, host: String, stream: Arc<Mutex<TcpStream>>) {
+    async fn set_replicas(&self, host: String, stream: Arc<Mutex<OwnedWriteHalf>>) {
         self.replicas
             .write()
             .await
@@ -110,6 +111,7 @@ impl MasterEngine for StoreEngine {
                 if let Some(stream) = self.replicas.read().await.get(&host.clone()) {
                     println!("syncing command to slave2: {} {}", host, cmd.clone());
                     let mut stream = stream.lock().await;
+                    println!("syncing command to slave3");
                     match stream.write_all(&cmd.as_bytes()).await {
                         Ok(_) => {}
                         Err(e) => {

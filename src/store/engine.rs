@@ -3,6 +3,7 @@ use crate::engine::array_to_resp_array;
 use priority_queue::PriorityQueue;
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use tokio::net::tcp::OwnedWriteHalf;
 // use std::io::prelude::*;
 use std::sync::Arc;
 use std::sync::RwLock;
@@ -22,7 +23,7 @@ pub struct StoreEngine {
     pub replica_info: RwLock<ReplicaType>,
     pub master_info: RwLock<MasterInfo>,
     pub slave_info: RwLock<SlaveInfo>,
-    pub replicas: sync::RwLock<HashMap<String, Arc<sync::Mutex<TcpStream>>>>,
+    pub replicas: sync::RwLock<HashMap<String, Arc<sync::Mutex<OwnedWriteHalf>>>>,
 }
 
 impl StoreEngine {
