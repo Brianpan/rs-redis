@@ -14,13 +14,12 @@ use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 
-pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream, addr: SocketAddr) {
+pub async fn handle_connection(db: &Arc<StoreEngine>, stream: TcpStream, addr: SocketAddr) {
     let mut cmd = String::new();
     let mut buf = [0; 512];
     let mut maybe_split = false;
 
     let addr = addr.to_string();
-    // println!("New connection from: {}", addr.clone());
 
     // stack to handle nested commands
     let mut cmd_stack: VecDeque<Arc<RwLock<RespMessage>>> = VecDeque::new();
@@ -33,12 +32,9 @@ pub async fn handle_connection(db: &Arc<StoreEngine>, mut stream: TcpStream, add
     let arc_tx = Arc::new(Mutex::new(tx));
 
     let actor = ReplicatorHandle::new(db.clone());
-    // tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
-    println!("New connection from: {}", addr.clone());
     loop {
         let _ = rx.readable();
-        println!("=====================");
         let chrs = rx.read(&mut buf).await;
         match chrs {
             Ok(n) => {
@@ -145,7 +141,6 @@ async fn command_handler_callback(
         }
         CommandHandlerResponse::Psync { message, host } => {
             // we need to store stream to replicas
-            println!("set replica: {}", host.clone());
             db.set_replicas(host, stream.clone()).await;
 
             for resp in message {

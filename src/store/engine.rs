@@ -158,12 +158,10 @@ impl StoreEngine {
             let mut buf = [0; 1024];
             writer.write(ping_cmd.as_bytes()).await?;
             writer.flush().await?;
-            println!("ping sent to master");
 
             match reader.read(&mut buf).await {
                 Ok(buf_len) => {
                     let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
-                    println!("ping response: {}", resp);
                     if !resp.contains("+PONG") {
                         return Err(anyhow::anyhow!("Handshake PING failed"));
                     }

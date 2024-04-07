@@ -60,8 +60,6 @@ pub fn command_handler(
         }
         RespType::Array => {
             // TODO
-            println!("handling");
-
             match cmd.read().unwrap().vec_data[0].resp_type {
                 RespType::BulkString => {
                     return match cmd.read().unwrap().vec_data[0]
@@ -124,7 +122,6 @@ pub fn command_handler(
                             }
                         }
                         COMMAND_PING => {
-                            println!("get ping");
                             resp_vec.push(RESP_PONG.to_string().as_bytes().to_vec());
                             Ok(CommandHandlerResponse::Basic(resp_vec))
                         }

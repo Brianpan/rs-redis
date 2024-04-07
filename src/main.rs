@@ -6,7 +6,6 @@ use engine::connection::handle_connection;
 use std::sync::Arc;
 use store::engine::StoreEngine;
 
-use tokio::sync::Mutex;
 use tokio::{net::TcpListener, spawn};
 
 const PROGRAM_NAME: &str = "rs-redis";
@@ -64,13 +63,10 @@ async fn main() -> std::io::Result<()> {
         reaper_db.expired_reaper().await;
     });
 
-    println!("start accept");
-
-    while let Ok((mut socket, addr)) = listener.accept().await {
+    while let Ok((socket, addr)) = listener.accept().await {
         let cdb = db.clone();
         // let std_stream = socket.into_std()?;
         // let stream = Arc::new(Mutex::new(socket));
-        println!("New accept from: {}", addr.clone());
         tokio::spawn(async move { handle_connection(&cdb, socket, addr).await });
     }
 

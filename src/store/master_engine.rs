@@ -5,7 +5,6 @@ use crate::engine::array_to_resp_array;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::OwnedWriteHalf;
-use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 
 pub trait MasterEngine {
@@ -105,13 +104,10 @@ impl MasterEngine for StoreEngine {
             let cmd_vec1 = cmd_vec.clone();
 
             if slave.handshake_state == HandshakeState::Psync {
-                println!("syncing command to slave: {} {}", host, cmd.clone());
                 // send command to slave
                 let cmd = array_to_resp_array(cmd_vec1);
                 if let Some(stream) = self.replicas.read().await.get(&host.clone()) {
-                    println!("syncing command to slave2: {} {}", host, cmd.clone());
                     let mut stream = stream.lock().await;
-                    println!("syncing command to slave3");
                     match stream.write_all(&cmd.as_bytes()).await {
                         Ok(_) => {}
                         Err(e) => {
@@ -119,7 +115,6 @@ impl MasterEngine for StoreEngine {
                         }
                     }
                 }
-                println!("TBD sync");
             }
         }
         Ok(())

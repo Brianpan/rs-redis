@@ -26,7 +26,6 @@ impl ReplicatorActor {
     pub async fn handle(&mut self, msg: ReplicatorActorMessage) {
         match msg {
             ReplicatorActorMessage::SetOp { cmd, respond_to } => {
-                println!("replicator received command: {}", cmd);
                 let _ = self.db.sync_command(cmd).await;
                 let _ = respond_to.send(true);
             }

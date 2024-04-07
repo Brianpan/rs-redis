@@ -96,7 +96,6 @@ pub fn handle_replica(
 
     if cmd.read().unwrap().vec_data.len() > 2 {
         let host = cmd.read().unwrap().remote_addr.clone();
-        println!("replica remote host: {}", host.clone());
 
         match cmd.read().unwrap().vec_data[1]
             .str_data
