@@ -1,8 +1,11 @@
 pub mod commands;
 pub mod connection;
 mod handler;
+pub mod parser;
 
 use hex;
+
+const CRLR: &str = "\r\n";
 
 const RESP_OK: &str = "+OK\r\n";
 const RESP_ERR: &str = "-ERR\r\n";
@@ -30,6 +33,15 @@ pub enum RespType {
     SimpleString,
     BulkString,
     Array,
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum RespCommandType {
+    Error,
+    Get(String),
+    Set(String, String),
+    SetPx(String, String, u64),
+    Ping,
 }
 
 pub enum CommandHandlerResponse {
