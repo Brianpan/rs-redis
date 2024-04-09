@@ -246,6 +246,7 @@ impl StoreEngine {
             // }
 
             // read the command
+            println!("before loop");
             loop {
                 match reader.read(&mut buf).await {
                     Ok(buf_len) => {
