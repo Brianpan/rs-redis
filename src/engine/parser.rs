@@ -2,7 +2,7 @@ use super::{RespCommandType, RespParsingState, RespType};
 use anyhow;
 
 // we assume that the input is always a RESP array
-pub fn command_parser(input: &str) -> anyhow::Result<RespCommandType> {
+pub fn command_parser(input: &str) -> anyhow::Result<Vec<RespCommandType>> {
     let mut iter = input.char_indices().peekable();
     let mut parsing_state = RespParsingState::ParsingMeta;
     if iter.peek() != Some(&(0, '*')) {
@@ -15,8 +15,14 @@ pub fn command_parser(input: &str) -> anyhow::Result<RespCommandType> {
     let mut cmd_vec = Vec::new();
     let mut cmd_number = 0;
 
+    let mut resp_vec = Vec::new();
     while let Some((pos, c)) = iter.next() {
         match c {
+            '*' => {
+                if parsing_state == RespParsingState::ParsingMeta {
+                    current_resp_type = RespType::Array;
+                }
+            }
             '$' => {
                 if parsing_state == RespParsingState::ParsingMeta {
                     current_resp_type = RespType::BulkString;
@@ -47,6 +53,14 @@ pub fn command_parser(input: &str) -> anyhow::Result<RespCommandType> {
                                 .map(|(_pos, ch)| ch)
                                 .collect::<String>();
                             cmd_vec.push(str_data);
+                            cmd_number -= 1;
+
+                            // new command
+                            if cmd_number == 0 {
+                                resp_vec.push(process_command_vec(cmd_vec));
+                                cmd_vec = Vec::new();
+                                parsing_state = RespParsingState::ParsingMeta;
+                            }
                         }
                     } else {
                         return Err(anyhow::anyhow!("Invalid RESP command"));
@@ -63,69 +77,83 @@ pub fn command_parser(input: &str) -> anyhow::Result<RespCommandType> {
         }
     }
 
-    if cmd_vec.len() != cmd_number || cmd_number == 0 {
-        return Err(anyhow::anyhow!("Invalid RESP command"));
+    Ok(resp_vec)
+}
+
+fn process_command_vec(cmd_vec: Vec<String>) -> RespCommandType {
+    if cmd_vec.len() == 0 {
+        return RespCommandType::Error;
     }
 
-    println!("get cmd: {:?}", cmd_vec);
-
     match cmd_vec[0].to_lowercase().as_str() {
-        "ping" => Ok(RespCommandType::Ping),
+        "ping" => RespCommandType::Ping,
         "set" => {
             if cmd_vec.len() < 3 {
-                return Err(anyhow::anyhow!("Invalid RESP command"));
+                return RespCommandType::Error;
             }
 
             if cmd_vec.len() == 3 {
-                return Ok(RespCommandType::Set(cmd_vec[1].clone(), cmd_vec[2].clone()));
+                return RespCommandType::Set(cmd_vec[1].clone(), cmd_vec[2].clone());
             }
             if cmd_vec.len() != 5 {
-                return Err(anyhow::anyhow!("Invalid RESP command"));
+                return RespCommandType::Error;
             }
             if cmd_vec[3].to_lowercase() != "px" {
-                return Err(anyhow::anyhow!("Invalid RESP command"));
+                return RespCommandType::Error;
             }
-            let ttl = cmd_vec[4].parse::<u64>()?;
-            Ok(RespCommandType::SetPx(
-                cmd_vec[1].clone(),
-                cmd_vec[2].clone(),
-                ttl,
-            ))
+            if let Ok(ttl) = cmd_vec[4].parse::<u64>() {
+                RespCommandType::SetPx(cmd_vec[1].clone(), cmd_vec[2].clone(), ttl)
+            } else {
+                return RespCommandType::Error;
+            }
         }
         "get" => {
             if cmd_vec.len() != 2 {
-                return Err(anyhow::anyhow!("Invalid RESP command"));
+                return RespCommandType::Error;
             }
-            Ok(RespCommandType::Get(cmd_vec[1].clone()))
+            RespCommandType::Get(cmd_vec[1].clone())
         }
-        _ => Err(anyhow::anyhow!("Unknown command")),
+        _ => RespCommandType::Error,
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::vec;
+
     use super::*;
 
     #[test]
     fn command_parser_test() {
         assert_eq!(
-            command_parser("*1\r\n$4\r\nping\r\n").unwrap(),
+            command_parser("*1\r\n$4\r\nping\r\n").unwrap()[0],
             RespCommandType::Ping
         );
         assert_eq!(
-            command_parser("*3\r\n$3\r\nset\r\n$3\r\nkey\r\n$5\r\nvalue\r\n").unwrap(),
+            command_parser("*3\r\n$3\r\nset\r\n$3\r\nkey\r\n$5\r\nvalue\r\n").unwrap()[0],
             RespCommandType::Set("key".to_string(), "value".to_string())
         );
         assert_eq!(
             command_parser(
                 "*5\r\n$3\r\nset\r\n$3\r\nkey\r\n$5\r\nvalue\r\n$2\r\npx\r\n$3\r\n100\r\n"
             )
-            .unwrap(),
+            .unwrap()[0],
             RespCommandType::SetPx("key".to_string(), "value".to_string(), 100)
         );
         assert_eq!(
-            command_parser("*2\r\n$3\r\nget\r\n$3\r\nkey\r\n").unwrap(),
+            command_parser("*2\r\n$3\r\nget\r\n$3\r\nkey\r\n").unwrap()[0],
             RespCommandType::Get("key".to_string())
         );
+    }
+
+    #[test]
+    fn command_parser_test2() {
+        let mut vec1 = Vec::new();
+        vec1.push(RespCommandType::Set("foo".to_string(), "123".to_string()));
+        vec1.push(RespCommandType::Set("bar".to_string(), "456".to_string()));
+        assert_eq!(
+            command_parser("*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\n123\r\n*3\r\n$3\r\nSET\r\n$3\r\nbar\r\n$3\r\n456\r\n").unwrap(),
+            vec1,
+        )
     }
 }

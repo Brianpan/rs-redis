@@ -247,24 +247,26 @@ impl StoreEngine {
             loop {
                 match reader.read(&mut buf).await {
                     Ok(buf_len) => {
-                        println!("in loop, {}", buf_len);
                         if buf_len == 0 {
                             break;
                         }
 
                         let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
-                        println!("resp: {:?}", resp);
 
                         match command_parser(&resp.into_owned()) {
-                            Ok(cmd) => match cmd {
-                                RespCommandType::Set(key, value) => {
-                                    self.set(key, value);
+                            Ok(cmds) => {
+                                for cmd in cmds {
+                                    match cmd {
+                                        RespCommandType::Set(key, value) => {
+                                            self.set(key, value);
+                                        }
+                                        RespCommandType::SetPx(key, value, ttl) => {
+                                            self.set_with_expire(key, value, ttl.into());
+                                        }
+                                        _ => {}
+                                    }
                                 }
-                                RespCommandType::SetPx(key, value, ttl) => {
-                                    self.set_with_expire(key, value, ttl.into());
-                                }
-                                _ => {}
-                            },
+                            }
                             Err(_) => {}
                         }
                     }
