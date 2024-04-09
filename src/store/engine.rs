@@ -252,6 +252,7 @@ impl StoreEngine {
                         }
 
                         let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
+                        println!("resp: {:?}", resp);
 
                         match command_parser(&resp.into_owned()) {
                             Ok(cmd) => match cmd {
