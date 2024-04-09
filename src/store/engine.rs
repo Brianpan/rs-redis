@@ -245,6 +245,7 @@ impl StoreEngine {
 
             // read the command
             loop {
+                println!("in loop");
                 match reader.read(&mut buf).await {
                     Ok(buf_len) => {
                         if buf_len == 0 {
