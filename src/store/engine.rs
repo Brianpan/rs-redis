@@ -252,9 +252,10 @@ impl StoreEngine {
                         }
 
                         let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
-
+                        println!("loop {}", resp);
                         match command_parser(&resp.into_owned()) {
                             Ok(cmds) => {
+                                println!("cmds: {:?}", cmds);
                                 for cmd in cmds {
                                     match cmd {
                                         RespCommandType::Set(key, value) => {
