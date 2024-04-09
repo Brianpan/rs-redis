@@ -5,11 +5,7 @@ use anyhow;
 pub fn command_parser(input: &str) -> anyhow::Result<Vec<RespCommandType>> {
     let mut iter = input.char_indices().peekable();
     let mut parsing_state = RespParsingState::ParsingMeta;
-    if iter.peek() != Some(&(0, '*')) {
-        return Err(anyhow::anyhow!("Invalid RESP command"));
-    }
 
-    iter.next();
     let mut current_resp_type = RespType::Array;
 
     let mut cmd_vec = Vec::new();
