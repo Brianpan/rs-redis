@@ -37,15 +37,17 @@ pub fn command_parser(input: &str) -> anyhow::Result<RespCommandType> {
                     if iter.next_if_eq(&(end, '\r')).is_some()
                         && iter.next_if_eq(&(end + 1, '\n')).is_some()
                     {
-                        iter.next();
-                        parsing_state = RespParsingState::ParsingData;
                         if current_resp_type == RespType::Array {
                             cmd_number = num;
                         } else {
-                            let str_data = iter.take(num).map(|(_pos, ch)| ch).collect::<String>();
+                            parsing_state = RespParsingState::ParsingData;
+                            let str_data = iter
+                                .by_ref()
+                                .take(num)
+                                .map(|(_pos, ch)| ch)
+                                .collect::<String>();
                             cmd_vec.push(str_data);
                         }
-                        break;
                     } else {
                         return Err(anyhow::anyhow!("Invalid RESP command"));
                     }
@@ -54,7 +56,6 @@ pub fn command_parser(input: &str) -> anyhow::Result<RespCommandType> {
             _ => {
                 if c == '\r' {
                     if iter.next_if_eq(&(pos + 1, '\n')).is_some() {
-                        iter.next();
                         parsing_state = RespParsingState::ParsingMeta;
                     }
                 }
@@ -76,11 +77,17 @@ pub fn command_parser(input: &str) -> anyhow::Result<RespCommandType> {
             if cmd_vec.len() == 3 {
                 return Ok(RespCommandType::Set(cmd_vec[1].clone(), cmd_vec[2].clone()));
             }
-            let px = cmd_vec[3].parse::<u64>()?;
+            if cmd_vec.len() != 5 {
+                return Err(anyhow::anyhow!("Invalid RESP command"));
+            }
+            if cmd_vec[3].to_lowercase() != "px" {
+                return Err(anyhow::anyhow!("Invalid RESP command"));
+            }
+            let ttl = cmd_vec[4].parse::<u64>()?;
             Ok(RespCommandType::SetPx(
                 cmd_vec[1].clone(),
                 cmd_vec[2].clone(),
-                px,
+                ttl,
             ))
         }
         "get" => {
@@ -94,22 +101,29 @@ pub fn command_parser(input: &str) -> anyhow::Result<RespCommandType> {
 }
 
 #[cfg(test)]
-fn test_command_parser() {
-    assert_eq!(
-        command_parser("*1\r\n$4\r\nping\r\n").unwrap(),
-        RespCommandType::Ping
-    );
-    assert_eq!(
-        command_parser("*3\r\n$3\r\nset\r\n$3\r\nkey\r\n$5\r\nvalue\r\n").unwrap(),
-        RespCommandType::Set("key".to_string(), "value".to_string())
-    );
-    assert_eq!(
-        command_parser("*4\r\n$4\r\nset\r\n$3\r\nkey\r\n$5\r\nvalue\r\n$2\r\npx\r\n$3\r\n100\r\n")
+mod test {
+    use super::*;
+
+    #[test]
+    fn command_parser_test() {
+        assert_eq!(
+            command_parser("*1\r\n$4\r\nping\r\n").unwrap(),
+            RespCommandType::Ping
+        );
+        assert_eq!(
+            command_parser("*3\r\n$3\r\nset\r\n$3\r\nkey\r\n$5\r\nvalue\r\n").unwrap(),
+            RespCommandType::Set("key".to_string(), "value".to_string())
+        );
+        assert_eq!(
+            command_parser(
+                "*5\r\n$3\r\nset\r\n$3\r\nkey\r\n$5\r\nvalue\r\n$2\r\npx\r\n$3\r\n100\r\n"
+            )
             .unwrap(),
-        RespCommandType::SetPx("key".to_string(), "value".to_string(), 100)
-    );
-    assert_eq!(
-        command_parser("*2\r\n$3\r\nget\r\n$3\r\nkey\r\n").unwrap(),
-        RespCommandType::Get("key".to_string())
-    );
+            RespCommandType::SetPx("key".to_string(), "value".to_string(), 100)
+        );
+        assert_eq!(
+            command_parser("*2\r\n$3\r\nget\r\n$3\r\nkey\r\n").unwrap(),
+            RespCommandType::Get("key".to_string())
+        );
+    }
 }

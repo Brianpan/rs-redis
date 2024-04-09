@@ -5,7 +5,7 @@ pub mod parser;
 
 use hex;
 
-const CRLR: &str = "\r\n";
+// const CRLR: &str = "\r\n";
 
 const RESP_OK: &str = "+OK\r\n";
 const RESP_ERR: &str = "-ERR\r\n";

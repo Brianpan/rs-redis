@@ -1,5 +1,6 @@
 use super::{HandshakeState, MasterInfo, NodeInfo, ReplicaType, SlaveInfo};
-use crate::engine::array_to_resp_array;
+use crate::engine::parser::command_parser;
+use crate::engine::{array_to_resp_array, RespCommandType};
 use priority_queue::PriorityQueue;
 use std::cmp::Reverse;
 use std::collections::HashMap;
@@ -124,6 +125,8 @@ impl StoreEngine {
 
     pub async fn handshake_to_master(&self) -> anyhow::Result<()> {
         if let ReplicaType::Slave(master) = self.get_replica() {
+            println!("handshake to master");
+
             let mut stream = TcpStream::connect(master).await?;
 
             let (rx, tx) = stream.split();
@@ -171,6 +174,8 @@ impl StoreEngine {
                 }
             }
 
+            println!("handshake to master pinged");
+
             writer.write(replconf_cmd.as_bytes()).await?;
             writer.flush().await?;
             match reader.read(&mut buf).await {
@@ -184,6 +189,9 @@ impl StoreEngine {
                     return Err(anyhow::Error::new(e));
                 }
             }
+
+            println!("handshake to master replicaof");
+
             writer.write(replconf_capa_cmd.as_bytes()).await?;
             writer.flush().await?;
             match reader.read(&mut buf).await {
@@ -197,6 +205,8 @@ impl StoreEngine {
                     return Err(anyhow::Error::new(e));
                 }
             }
+
+            println!("handshake to master repliconf capa");
 
             writer.write(psync_cmd.as_bytes()).await?;
             writer.flush().await?;
@@ -230,14 +240,43 @@ impl StoreEngine {
                 }
             }
 
+            println!("handshake to master psync");
+
             //     // read rdb file
-            match reader.read(&mut buf).await {
-                Ok(buf_len) => {
-                    let rdb = String::from_utf8_lossy(buf[..buf_len].as_ref());
-                    println!("rdb: {}", rdb);
-                }
-                Err(e) => {
-                    return Err(anyhow::Error::new(e));
+            // match reader.read(&mut buf).await {
+            //     Ok(buf_len) => {
+            //         let _rdb = String::from_utf8_lossy(buf[..buf_len].as_ref());
+            //         // println!("rdb: {}", rdb);
+            //     }
+            //     Err(e) => {
+            //         return Err(anyhow::Error::new(e));
+            //     }
+            // }
+
+            // read the command
+            loop {
+                match reader.read(&mut buf).await {
+                    Ok(buf_len) => {
+                        if buf_len == 0 {
+                            break;
+                        }
+
+                        let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
+
+                        match command_parser(&resp.into_owned()) {
+                            Ok(cmd) => match cmd {
+                                RespCommandType::Set(key, value) => {
+                                    self.set(key, value);
+                                }
+                                RespCommandType::SetPx(key, value, ttl) => {
+                                    self.set_with_expire(key, value, ttl.into());
+                                }
+                                _ => {}
+                            },
+                            Err(_) => {}
+                        }
+                    }
+                    Err(_) => {}
                 }
             }
         }
