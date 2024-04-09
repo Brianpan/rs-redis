@@ -128,10 +128,10 @@ impl StoreEngine {
             let mut stream = TcpStream::connect(master).await?;
 
             let (rx, tx) = stream.split();
-            let mut reader = BufReader::new(rx);
-            let mut writer = BufWriter::new(tx);
-            // let mut reader = rx;
-            // let mut writer = tx;
+            // let mut reader = BufReader::new(rx);
+            // let mut writer = BufWriter::new(tx);
+            let mut reader = rx;
+            let mut writer = tx;
 
             let redis_port = self.node_info.read().unwrap().port.clone();
 
@@ -246,7 +246,7 @@ impl StoreEngine {
             // }
 
             // read the command
-            // println!("before loop");
+            println!("before loop");
             loop {
                 match reader.read(&mut buf).await {
                     Ok(buf_len) => {
