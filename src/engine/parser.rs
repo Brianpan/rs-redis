@@ -67,6 +67,8 @@ pub fn command_parser(input: &str) -> anyhow::Result<RespCommandType> {
         return Err(anyhow::anyhow!("Invalid RESP command"));
     }
 
+    println!("get cmd: {:?}", cmd_vec);
+
     match cmd_vec[0].to_lowercase().as_str() {
         "ping" => Ok(RespCommandType::Ping),
         "set" => {

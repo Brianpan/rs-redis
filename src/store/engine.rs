@@ -125,8 +125,6 @@ impl StoreEngine {
 
     pub async fn handshake_to_master(&self) -> anyhow::Result<()> {
         if let ReplicaType::Slave(master) = self.get_replica() {
-            println!("handshake to master");
-
             let mut stream = TcpStream::connect(master).await?;
 
             let (rx, tx) = stream.split();
@@ -174,8 +172,6 @@ impl StoreEngine {
                 }
             }
 
-            println!("handshake to master pinged");
-
             writer.write(replconf_cmd.as_bytes()).await?;
             writer.flush().await?;
             match reader.read(&mut buf).await {
@@ -190,8 +186,6 @@ impl StoreEngine {
                 }
             }
 
-            println!("handshake to master replicaof");
-
             writer.write(replconf_capa_cmd.as_bytes()).await?;
             writer.flush().await?;
             match reader.read(&mut buf).await {
@@ -205,8 +199,6 @@ impl StoreEngine {
                     return Err(anyhow::Error::new(e));
                 }
             }
-
-            println!("handshake to master repliconf capa");
 
             writer.write(psync_cmd.as_bytes()).await?;
             writer.flush().await?;
@@ -239,8 +231,6 @@ impl StoreEngine {
                     return Err(anyhow::Error::new(e));
                 }
             }
-
-            println!("handshake to master psync");
 
             //     // read rdb file
             // match reader.read(&mut buf).await {
