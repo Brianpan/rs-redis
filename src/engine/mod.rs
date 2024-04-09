@@ -35,6 +35,7 @@ pub enum RespType {
     Array,
 }
 
+#[warn(dead_code)]
 #[derive(PartialEq, Clone, Debug)]
 pub enum RespCommandType {
     Error,
