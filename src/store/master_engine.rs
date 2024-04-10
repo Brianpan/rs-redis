@@ -28,6 +28,8 @@ pub trait MasterEngine {
         &self,
         cmd: String,
     ) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
+
+    fn healthcheck_to_slave(&self) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
 }
 
 impl MasterEngine for StoreEngine {
@@ -117,6 +119,41 @@ impl MasterEngine for StoreEngine {
                 }
             }
         }
+        Ok(())
+    }
+
+    async fn healthcheck_to_slave(&self) -> anyhow::Result<()> {
+        if !self.is_master() {
+            return Err(anyhow::anyhow!("err: not master"));
+        }
+        let get_ack_cmd = array_to_resp_array(vec![
+            "REPLCONF".to_string(),
+            "GETACK".to_string(),
+            "*".to_string(),
+        ]);
+
+        loop {
+            let mut slave_list = self.master_info.read().unwrap().slave_list.clone();
+
+            for (host, slave) in slave_list.iter_mut() {
+                // let cmd_vec1 = cmd_vec.clone();
+
+                if slave.handshake_state == HandshakeState::Psync {
+                    // send command to slave
+                    if let Some(stream) = self.replicas.read().await.get(&host.clone()) {
+                        let mut stream = stream.lock().await;
+                        match stream.write_all(&get_ack_cmd.as_bytes()).await {
+                            Ok(_) => {}
+                            Err(e) => {
+                                println!("err: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        }
+
         Ok(())
     }
 }

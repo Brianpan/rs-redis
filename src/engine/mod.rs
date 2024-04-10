@@ -43,6 +43,7 @@ pub enum RespCommandType {
     Set(String, String),
     SetPx(String, String, u64),
     Ping,
+    Replconf(String),
 }
 
 pub enum CommandHandlerResponse {

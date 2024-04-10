@@ -255,7 +255,7 @@ impl StoreEngine {
                         }
 
                         let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
-                        println!("loop {}", resp);
+                        // println!("loop {}", resp);
                         match command_parser(&resp.into_owned()) {
                             Ok(cmds) => {
                                 // println!("cmds: {:?}", cmds);
@@ -266,6 +266,19 @@ impl StoreEngine {
                                         }
                                         RespCommandType::SetPx(key, value, ttl) => {
                                             self.set_with_expire(key, value, ttl.into());
+                                        }
+                                        // reply ack with offset to the master
+                                        RespCommandType::Replconf(key) => {
+                                            if key == "getack" {
+                                                // send ack to master
+                                                let ack_cmd = array_to_resp_array(vec![
+                                                    "REPLCONF".to_string(),
+                                                    "ACK".to_string(),
+                                                    "0".to_string(),
+                                                ]);
+                                                writer.write(ack_cmd.as_bytes()).await?;
+                                                writer.flush().await?;
+                                            }
                                         }
                                         _ => {}
                                     }

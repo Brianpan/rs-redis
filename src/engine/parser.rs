@@ -109,6 +109,16 @@ fn process_command_vec(cmd_vec: Vec<String>) -> RespCommandType {
             }
             RespCommandType::Get(cmd_vec[1].clone())
         }
+        "replconf" => {
+            if cmd_vec.len() < 3 {
+                return RespCommandType::Error;
+            }
+
+            match cmd_vec[1].to_lowercase().as_str() {
+                "getack" => RespCommandType::Replconf(String::from("getack")),
+                _ => RespCommandType::Error,
+            }
+        }
         _ => RespCommandType::Error,
     }
 }

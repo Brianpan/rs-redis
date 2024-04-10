@@ -5,7 +5,7 @@ use clap::{Arg, Command};
 use engine::connection::handle_connection;
 use std::sync::Arc;
 use store::engine::StoreEngine;
-
+use store::master_engine::MasterEngine;
 use tokio::{net::TcpListener, spawn};
 
 const PROGRAM_NAME: &str = "rs-redis";
@@ -54,6 +54,11 @@ async fn main() -> std::io::Result<()> {
         let db = db.clone();
         spawn(async move {
             let _ = db.handshake_to_master().await;
+        });
+    } else {
+        let healthcheck_db = db.clone();
+        spawn(async move {
+            let _ = healthcheck_db.healthcheck_to_slave().await;
         });
     }
 
