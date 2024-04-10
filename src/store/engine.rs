@@ -205,11 +205,11 @@ impl StoreEngine {
             writer.write(psync_cmd.as_bytes()).await?;
             writer.flush().await?;
             match reader.read(&mut buf).await {
-                Ok(buf_len) => {
-                    let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
-                    if !resp.contains(FULLRESYNC) {
-                        return Err(anyhow::anyhow!("Handshake PSYNC failed"));
-                    }
+                Ok(_buf_len) => {
+                    // let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
+                    // if !resp.contains(FULLRESYNC) {
+                    //     return Err(anyhow::anyhow!("Handshake PSYNC failed"));
+                    // }
                     // parse the master id
                     // handmade parsing this time,
                     // will use nom parser to write RESP protocol parser in the future
