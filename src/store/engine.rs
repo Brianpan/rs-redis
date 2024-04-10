@@ -15,7 +15,7 @@ use tokio::sync;
 
 // https://github.com/tokio-rs/tokio/blob/master/examples/tinydb.rs
 
-const FULLRESYNC: &str = "+FULLRESYNC";
+// const FULLRESYNC: &str = "+FULLRESYNC";
 
 pub struct StoreEngine {
     dict: RwLock<HashMap<String, String>>,
@@ -262,6 +262,7 @@ impl StoreEngine {
                                 for cmd in cmds {
                                     match cmd {
                                         RespCommandType::Set(key, value) => {
+                                            println!("set key!");
                                             self.set(key, value);
                                         }
                                         RespCommandType::SetPx(key, value, ttl) => {
