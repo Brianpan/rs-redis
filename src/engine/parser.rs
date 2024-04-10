@@ -50,6 +50,7 @@ pub fn command_parser(input: &str) -> anyhow::Result<Vec<RespCommandType>> {
                         end += 1;
                     }
                     let num = input[start..end].to_owned().parse::<usize>()?;
+                    println!("collect number: {}", num);
 
                     if iter.next_if_eq(&(end, '\r')).is_some()
                         && iter.next_if_eq(&(end + 1, '\n')).is_some()
