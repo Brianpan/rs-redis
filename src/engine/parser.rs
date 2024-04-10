@@ -48,11 +48,13 @@ pub fn command_parser(input: &str) -> anyhow::Result<Vec<RespCommandType>> {
                                 .take(num)
                                 .map(|(_pos, ch)| ch)
                                 .collect::<String>();
+
                             cmd_vec.push(str_data);
                             cmd_number -= 1;
 
                             // new command
-                            if cmd_number == 0 {
+                            // include string case
+                            if cmd_number <= 0 {
                                 resp_vec.push(process_command_vec(cmd_vec));
                                 cmd_vec = Vec::new();
                                 parsing_state = RespParsingState::ParsingMeta;
