@@ -136,14 +136,14 @@ impl MasterEngine for StoreEngine {
             let mut slave_list = self.master_info.read().unwrap().slave_list.clone();
 
             for (host, slave) in slave_list.iter_mut() {
-                // let cmd_vec1 = cmd_vec.clone();
-
                 if slave.handshake_state == HandshakeState::Psync {
                     // send command to slave
                     if let Some(stream) = self.replicas.read().await.get(&host.clone()) {
                         let mut stream = stream.lock().await;
                         match stream.write_all(&get_ack_cmd.as_bytes()).await {
-                            Ok(_) => {}
+                            Ok(_) => {
+                                println!("sent healthcheck to slave: {}", host);
+                            }
                             Err(e) => {
                                 println!("err: {}", e);
                             }
@@ -151,7 +151,7 @@ impl MasterEngine for StoreEngine {
                     }
                 }
             }
-            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         }
 
         Ok(())

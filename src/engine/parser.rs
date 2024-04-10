@@ -109,6 +109,7 @@ fn process_command_vec(cmd_vec: Vec<String>) -> RespCommandType {
             }
             RespCommandType::Get(cmd_vec[1].clone())
         }
+        // return replconf
         "replconf" => {
             if cmd_vec.len() < 3 {
                 return RespCommandType::Error;
@@ -160,6 +161,13 @@ mod test {
         assert_eq!(
             command_parser("*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\n123\r\n*3\r\n$3\r\nSET\r\n$3\r\nbar\r\n$3\r\n456\r\n").unwrap(),
             vec1,
-        )
+        );
+
+        let mut vec2 = Vec::new();
+        vec2.push(RespCommandType::Replconf(("getack").to_string()));
+        assert_eq!(
+            command_parser("*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n").unwrap(),
+            vec2,
+        );
     }
 }

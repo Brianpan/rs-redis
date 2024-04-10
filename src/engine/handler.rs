@@ -1,8 +1,8 @@
 use std::sync::{Arc, RwLock};
 
 use super::{
-    string_to_bulk_string, string_to_bulk_string_for_psync, CommandHandlerResponse, RespMessage,
-    EMPTY_RDB, MYID, RESP_OK,
+    array_to_resp_array, string_to_bulk_string, string_to_bulk_string_for_psync,
+    CommandHandlerResponse, RespMessage, EMPTY_RDB, MYID, RESP_OK,
 };
 
 use crate::store::engine::StoreEngine;
@@ -94,6 +94,8 @@ pub fn handle_replica(
 ) -> Result<CommandHandlerResponse> {
     let mut resp_vec = Vec::new();
 
+    let ret = RESP_OK;
+
     if cmd.read().unwrap().vec_data.len() > 2 {
         let host = cmd.read().unwrap().remote_addr.clone();
 
@@ -106,15 +108,23 @@ pub fn handle_replica(
                 let stream_port = cmd.read().unwrap().vec_data[2].str_data.clone();
                 db.set_replica_as_master();
                 db.set_slave_node(host.clone(), stream_port.clone(), HandshakeState::Replconf);
+                resp_vec.push(ret.to_string().as_bytes().to_vec());
             }
             "capa" => {
-                db.set_slave_node(host.clone(), String::from(""), HandshakeState::ReplconfCapa)
+                db.set_slave_node(host.clone(), String::from(""), HandshakeState::ReplconfCapa);
+                resp_vec.push(ret.to_string().as_bytes().to_vec());
+            }
+            "getack" => {
+                let ack_cmd = array_to_resp_array(vec![
+                    "REPLCONF".to_string(),
+                    "GETACK".to_string(),
+                    "*".to_string(),
+                ]);
+                resp_vec.push(ack_cmd.as_bytes().to_vec());
             }
             _ => {}
         }
     }
-    let ret = RESP_OK;
-    resp_vec.push(ret.to_string().as_bytes().to_vec());
 
     Ok(CommandHandlerResponse::Basic(resp_vec))
 }
