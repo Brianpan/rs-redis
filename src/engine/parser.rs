@@ -24,6 +24,20 @@ pub fn command_parser(input: &str) -> anyhow::Result<Vec<RespCommandType>> {
                     current_resp_type = RespType::BulkString;
                 }
             }
+            '+' => {
+                if parsing_state == RespParsingState::ParsingMeta {
+                    let simple_string = iter
+                        .by_ref()
+                        .take_while(|(_pos, c)| *c != '\r')
+                        .map(|(_pos, c)| c)
+                        .collect();
+                    // expect next is \r\n
+                    cmd_vec = Vec::new();
+                    cmd_vec.push(simple_string);
+                    resp_vec.push(process_command_vec(cmd_vec));
+                    cmd_vec = Vec::new();
+                }
+            }
             '0'..='9' => {
                 if parsing_state == RespParsingState::ParsingMeta {
                     let start = pos;
@@ -152,6 +166,11 @@ mod test {
         assert_eq!(
             command_parser("*2\r\n$3\r\nget\r\n$3\r\nkey\r\n").unwrap()[0],
             RespCommandType::Get("key".to_string())
+        );
+        assert_eq!(
+            command_parser("+FULLRESYNC 75cd7bc10c49047e0d163660f3b90625b1af31dc 0\r\n").unwrap()
+                [0],
+            RespCommandType::Error
         );
     }
 
