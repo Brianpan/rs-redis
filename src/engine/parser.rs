@@ -36,6 +36,7 @@ pub fn command_parser(input: &str) -> anyhow::Result<Vec<RespCommandType>> {
                     cmd_vec.push(simple_string);
                     resp_vec.push(process_command_vec(cmd_vec));
                     cmd_vec = Vec::new();
+                    parsing_state = RespParsingState::ParsingMeta;
                 }
             }
             '0'..='9' => {
@@ -96,6 +97,8 @@ fn process_command_vec(cmd_vec: Vec<String>) -> RespCommandType {
     if cmd_vec.len() == 0 {
         return RespCommandType::Error;
     }
+
+    println!("cmd_vec: {:?}", cmd_vec);
 
     match cmd_vec[0].to_lowercase().as_str() {
         "ping" => RespCommandType::Ping,
