@@ -204,46 +204,46 @@ impl StoreEngine {
 
             writer.write(psync_cmd.as_bytes()).await?;
             writer.flush().await?;
-            match reader.read(&mut buf).await {
-                Ok(_buf_len) => {
-                    // let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
-                    // if !resp.contains(FULLRESYNC) {
-                    //     return Err(anyhow::anyhow!("Handshake PSYNC failed"));
-                    // }
-                    // parse the master id
-                    // handmade parsing this time,
-                    // will use nom parser to write RESP protocol parser in the future
-                    // +FULLRESYNC <REPL_ID> 0\r\n
-                    // simple string format so it's easier for us to parse
+            // match reader.read(&mut buf).await {
+            //     Ok(_buf_len) => {
+            //         // let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
+            //         // if !resp.contains(FULLRESYNC) {
+            //         //     return Err(anyhow::anyhow!("Handshake PSYNC failed"));
+            //         // }
+            //         // parse the master id
+            //         // handmade parsing this time,
+            //         // will use nom parser to write RESP protocol parser in the future
+            //         // +FULLRESYNC <REPL_ID> 0\r\n
+            //         // simple string format so it's easier for us to parse
 
-                    // let mut next_is_masterid = false;
-                    // while let Some(word) = resp.split_whitespace().next() {
-                    //     if word == FULLRESYNC {
-                    //         next_is_masterid = true;
-                    //         continue;
-                    //     } else if next_is_masterid {
-                    //         (*self.slave_info.write().unwrap()).master_replid =
-                    //             word.to_string().clone();
+            //         // let mut next_is_masterid = false;
+            //         // while let Some(word) = resp.split_whitespace().next() {
+            //         //     if word == FULLRESYNC {
+            //         //         next_is_masterid = true;
+            //         //         continue;
+            //         //     } else if next_is_masterid {
+            //         //         (*self.slave_info.write().unwrap()).master_replid =
+            //         //             word.to_string().clone();
 
-                    //         break;
-                    //     }
-                    // }
-                }
-                Err(e) => {
-                    return Err(anyhow::Error::new(e));
-                }
-            }
+            //         //         break;
+            //         //     }
+            //         // }
+            //     }
+            //     Err(e) => {
+            //         return Err(anyhow::Error::new(e));
+            //     }
+            // }
 
-            // read rdb file
-            match reader.read(&mut buf).await {
-                Ok(buf_len) => {
-                    let _rdb = String::from_utf8_lossy(buf[..buf_len].as_ref());
-                    // println!("rdb: {}", rdb);
-                }
-                Err(e) => {
-                    return Err(anyhow::Error::new(e));
-                }
-            }
+            // // read rdb file
+            // match reader.read(&mut buf).await {
+            //     Ok(buf_len) => {
+            //         let _rdb = String::from_utf8_lossy(buf[..buf_len].as_ref());
+            //         // println!("rdb: {}", rdb);
+            //     }
+            //     Err(e) => {
+            //         return Err(anyhow::Error::new(e));
+            //     }
+            // }
 
             // read the command
             // println!("before loop");
