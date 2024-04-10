@@ -258,7 +258,7 @@ impl StoreEngine {
                         println!("loop {}", resp);
                         match command_parser(&resp.into_owned()) {
                             Ok(cmds) => {
-                                // println!("cmds: {:?}", cmds);
+                                println!("cmds: {:?}", cmds);
                                 for cmd in cmds {
                                     match cmd {
                                         RespCommandType::Set(key, value) => {
