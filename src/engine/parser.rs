@@ -64,14 +64,14 @@ pub fn command_parser(input: &str) -> anyhow::Result<Vec<RespCommandType>> {
                                 .collect::<String>();
 
                             cmd_vec.push(str_data);
-                            cmd_number -= 1;
-
                             // new command
                             // include string case
-                            if cmd_number <= 0 {
+                            if cmd_number <= 1 {
                                 resp_vec.push(process_command_vec(cmd_vec));
                                 cmd_vec = Vec::new();
                                 parsing_state = RespParsingState::ParsingMeta;
+                            } else {
+                                cmd_number -= 1;
                             }
                         }
                     } else {
@@ -170,6 +170,10 @@ mod test {
         assert_eq!(
             command_parser("+FULLRESYNC 75cd7bc10c49047e0d163660f3b90625b1af31dc 0\r\n").unwrap()
                 [0],
+            RespCommandType::Error
+        );
+        assert_eq!(
+            command_parser("$3\r\nabc\r\n").unwrap()[0],
             RespCommandType::Error
         );
     }
