@@ -254,8 +254,8 @@ impl StoreEngine {
                             break;
                         }
 
-                        let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
-                        match command_parser(&resp.into_owned()) {
+                        // let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
+                        match command_parser(&mut buf[..buf_len]) {
                             Ok(cmds) => {
                                 println!("cmds: {:?}", cmds);
                                 for cmd in cmds {
