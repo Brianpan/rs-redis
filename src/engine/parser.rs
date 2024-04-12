@@ -153,10 +153,6 @@ fn process_command_vec(cmd_vec: Vec<String>) -> RespCommandType {
 
 #[cfg(test)]
 mod test {
-    use std::{
-        io::{BufWriter, Cursor, Write},
-        vec,
-    };
 
     use super::*;
 
