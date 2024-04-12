@@ -267,7 +267,7 @@ impl StoreEngine {
                                         }
                                         // reply ack with offset to the master
                                         RespCommandType::Replconf(key) => {
-                                            println!("receive healthcheck from master");
+                                            // println!("receive healthcheck from master");
                                             if key == "getack" {
                                                 // send ack to master
                                                 let ack_offset = self
