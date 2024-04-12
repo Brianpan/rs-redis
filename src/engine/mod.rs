@@ -12,6 +12,10 @@ const RESP_ERR: &str = "-ERR\r\n";
 const RESP_PONG: &str = "+PONG\r\n";
 const RESP_EMPTY: &str = "*0\r\n";
 
+// hardcoded lenth
+const PING_LEN: usize = 14;
+const REPL_GETACK_LEN: usize = 37;
+
 // preset id of master node (40 chars long)
 // it will be changed to a random value in the future
 const MYID: &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
@@ -177,4 +181,52 @@ pub fn array_to_resp_array(vec: Vec<String>) -> String {
     }
 
     return ret;
+}
+
+pub fn count_resp_command_type_offset(resp_command_type: RespCommandType) -> usize {
+    match resp_command_type {
+        RespCommandType::Error => 0,
+        RespCommandType::Get(k) => {
+            // *2\r\n$3\r\nGET\r\n$3\r\nkey\r\n
+            // 13 + 5
+            let mut base = 18;
+            base += k.len();
+            base += format!("{}", k.len()).len();
+            base
+        }
+        RespCommandType::Set(k, v) => {
+            // *3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\n123\r\n
+            // 13 + 5 + 5
+            let mut base = 23;
+            base += k.len() + v.len();
+            base += format!("{}{}", k.len(), v.len()).len();
+            base
+        }
+        RespCommandType::SetPx(k, v, ttl) => {
+            // *5\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\n123\r\n$2\r\nPX\r\n$3\r\n100\r\n
+            // 13 + 5 + 5 + 5 + 8
+            // 8 is $2\r\nPX\r\n
+            let mut base = 36;
+            base += k.len() + v.len();
+            base += format!("{}{}", k.len(), v.len()).len();
+            base += format!("{}", ttl).len();
+            base
+        }
+        RespCommandType::Ping => PING_LEN,
+        RespCommandType::Replconf(k) => match k.as_str() {
+            "getack" => REPL_GETACK_LEN,
+            _ => 0,
+        },
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_resp_message_parse() {
+        let cmd = RespCommandType::Get(String::from("foo"));
+        assert_eq!(count_resp_command_type_offset(cmd), 22);
+    }
 }

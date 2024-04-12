@@ -1,6 +1,6 @@
 use super::{HandshakeState, MasterInfo, NodeInfo, ReplicaType, SlaveInfo};
 use crate::engine::parser::command_parser;
-use crate::engine::{array_to_resp_array, RespCommandType};
+use crate::engine::{array_to_resp_array, count_resp_command_type_offset, RespCommandType};
 use priority_queue::PriorityQueue;
 use std::cmp::Reverse;
 use std::collections::HashMap;
@@ -254,14 +254,12 @@ impl StoreEngine {
                             break;
                         }
 
-                        // let resp = String::from_utf8_lossy(buf[..buf_len].as_ref());
                         match command_parser(&mut buf[..buf_len]) {
                             Ok(cmds) => {
                                 println!("cmds: {:?}", cmds);
                                 for cmd in cmds {
-                                    match cmd {
+                                    match cmd.clone() {
                                         RespCommandType::Set(key, value) => {
-                                            println!("set key!");
                                             self.set(key, value);
                                         }
                                         RespCommandType::SetPx(key, value, ttl) => {
@@ -272,10 +270,16 @@ impl StoreEngine {
                                             println!("receive healthcheck from master");
                                             if key == "getack" {
                                                 // send ack to master
+                                                let ack_offset = self
+                                                    .slave_info
+                                                    .read()
+                                                    .unwrap()
+                                                    .slave_repl_offset;
+
                                                 let ack_cmd = array_to_resp_array(vec![
                                                     "REPLCONF".to_string(),
                                                     "ACK".to_string(),
-                                                    "0".to_string(),
+                                                    format!("{}", ack_offset),
                                                 ]);
                                                 writer.write(ack_cmd.as_bytes()).await?;
                                                 writer.flush().await?;
@@ -283,6 +287,11 @@ impl StoreEngine {
                                         }
                                         _ => {}
                                     }
+
+                                    // add offset to the slave
+                                    let cmd_offset = count_resp_command_type_offset(cmd) as u64;
+                                    (*self.slave_info.write().unwrap()).slave_repl_offset +=
+                                        cmd_offset;
                                 }
                             }
                             Err(_) => {}
