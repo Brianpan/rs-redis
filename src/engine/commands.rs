@@ -137,7 +137,7 @@ pub fn command_handler(
                             Ok(CommandHandlerResponse::Basic(resp_vec))
                         }
                         COMMAND_WAIT => {
-                            let ret = string_to_bulk_string(String::from("0"));
+                            let ret = String::from(":0\r\n");
                             Ok(CommandHandlerResponse::Basic(vec![ret.as_bytes().to_vec()]))
                         }
                         COMMAND_INFO => handle_info(&db.clone(), cmd.clone()),
