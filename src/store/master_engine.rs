@@ -30,6 +30,8 @@ pub trait MasterEngine {
     ) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
 
     fn healthcheck_to_slave(&self) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
+
+    fn get_connected_replica_count(&self) -> u32;
 }
 
 impl MasterEngine for StoreEngine {
@@ -122,6 +124,7 @@ impl MasterEngine for StoreEngine {
         Ok(())
     }
 
+    #[allow(unreachable_code)]
     async fn healthcheck_to_slave(&self) -> anyhow::Result<()> {
         if !self.is_master() {
             return Err(anyhow::anyhow!("err: not master"));
@@ -155,5 +158,21 @@ impl MasterEngine for StoreEngine {
         }
 
         Ok(())
+    }
+
+    fn get_connected_replica_count(&self) -> u32 {
+        self.master_info
+            .read()
+            .unwrap()
+            .slave_list
+            .iter()
+            .map(|(_, v)| {
+                if v.handshake_state == HandshakeState::Psync {
+                    1
+                } else {
+                    0
+                }
+            })
+            .sum()
     }
 }

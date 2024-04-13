@@ -128,3 +128,19 @@ pub fn handle_replica(
 
     Ok(CommandHandlerResponse::Basic(resp_vec))
 }
+
+pub fn handle_wait(
+    db: &Arc<StoreEngine>,
+    _cmd: Arc<RwLock<RespMessage>>,
+) -> Result<CommandHandlerResponse> {
+    // let mut resp_vec = Vec::new();
+
+    // if cmd.read().unwrap().vec_data.len() > 1 {
+    //     let timeout = cmd.read().unwrap().vec_data[1].str_data.clone();
+    //     resp_vec.push(ret.to_string().as_bytes().to_vec());
+    // }
+
+    let ret = format!(":{}\r\n", db.get_connected_replica_count());
+
+    Ok(CommandHandlerResponse::Basic(vec![ret.as_bytes().to_vec()]))
+}

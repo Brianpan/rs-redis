@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use super::handler::{handle_info, handle_psync, handle_replica};
+use super::handler::{handle_info, handle_psync, handle_replica, handle_wait};
 use super::{
     CommandHandlerResponse, RespMessage, RespType, RESP_EMPTY, RESP_ERR, RESP_OK, RESP_PONG,
 };
@@ -136,10 +136,7 @@ pub fn command_handler(
                             resp_vec.push(ret.as_bytes().to_vec());
                             Ok(CommandHandlerResponse::Basic(resp_vec))
                         }
-                        COMMAND_WAIT => {
-                            let ret = String::from(":0\r\n");
-                            Ok(CommandHandlerResponse::Basic(vec![ret.as_bytes().to_vec()]))
-                        }
+                        COMMAND_WAIT => handle_wait(&db.clone(), cmd.clone()),
                         COMMAND_INFO => handle_info(&db.clone(), cmd.clone()),
                         // replconf always return OK
                         COMMAND_REPLCONF => handle_replica(&db.clone(), cmd.clone()),
