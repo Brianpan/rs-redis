@@ -18,6 +18,7 @@ const COMMAND_ECHO: &str = "echo";
 const COMMAND_INFO: &str = "info";
 const COMMAND_REPLCONF: &str = "replconf";
 const COMMAND_PSYNC: &str = "psync";
+const COMMAND_WAIT: &str = "wait";
 
 // we support multiple responses to handle commands like psync
 pub fn command_handler(
@@ -134,6 +135,10 @@ pub fn command_handler(
                             }
                             resp_vec.push(ret.as_bytes().to_vec());
                             Ok(CommandHandlerResponse::Basic(resp_vec))
+                        }
+                        COMMAND_WAIT => {
+                            let ret = String::from("0");
+                            Ok(CommandHandlerResponse::Basic(vec![ret.as_bytes().to_vec()]))
                         }
                         COMMAND_INFO => handle_info(&db.clone(), cmd.clone()),
                         // replconf always return OK
