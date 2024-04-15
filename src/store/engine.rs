@@ -51,6 +51,8 @@ impl StoreEngine {
             port: host.split(":").collect::<Vec<&str>>()[1].to_string(),
             master_replid: "?".to_string(),
             slave_repl_offset: 0,
+            slave_ping_count: 0,
+            slave_ack_count: 0,
             handshake_state: HandshakeState::Ping,
         }
     }
@@ -216,7 +218,7 @@ impl StoreEngine {
 
                         match command_parser(&mut buf[..buf_len]) {
                             Ok(cmds) => {
-                                println!("cmds: {:?}", cmds);
+                                // println!("cmds: {:?}", cmds);
                                 for cmd in cmds {
                                     match cmd.clone() {
                                         RespCommandType::Set(key, value) => {

@@ -160,6 +160,12 @@ async fn command_handler_callback(
                 stream.lock().await.write_all(&resp).await.unwrap();
             }
         }
+        CommandHandlerResponse::GetAck(resps) => {
+            let _ = actor.getack_op().await;
+            for resp in resps {
+                stream.lock().await.write_all(&resp).await.unwrap();
+            }
+        }
         CommandHandlerResponse::Wait {
             _message,
             wait_count,

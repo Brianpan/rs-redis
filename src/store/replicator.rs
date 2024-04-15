@@ -8,6 +8,9 @@ pub enum ReplicatorActorMessage {
         cmd: String,
         respond_to: oneshot::Sender<bool>,
     },
+    GetAck {
+        respond_to: oneshot::Sender<bool>,
+    },
     Wait {
         wait_count: u64,
         wait_time: u64,
@@ -32,6 +35,10 @@ impl ReplicatorActor {
         match msg {
             ReplicatorActorMessage::SetOp { cmd, respond_to } => {
                 let _ = self.db.sync_command(cmd).await;
+                let _ = respond_to.send(true);
+            }
+            ReplicatorActorMessage::GetAck { respond_to } => {
+                let _ = self.db.get_ack_to_slave().await;
                 let _ = respond_to.send(true);
             }
             ReplicatorActorMessage::Wait {
@@ -80,6 +87,15 @@ impl ReplicatorHandle {
             wait_time,
             respond_to: tx,
         };
+
+        let _ = self.sender.send(msg).await;
+
+        rx.await.expect("Failed to receive response")
+    }
+
+    pub async fn getack_op(&self) -> bool {
+        let (tx, rx) = oneshot::channel();
+        let msg = ReplicatorActorMessage::GetAck { respond_to: tx };
 
         let _ = self.sender.send(msg).await;
 

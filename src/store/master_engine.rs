@@ -39,6 +39,10 @@ pub trait MasterEngine {
     fn get_connected_replica_count(&self) -> u32;
 
     // to collect wait time and count
+    fn set_last_set_offset(&self, offset: u64);
+    fn get_last_set_offset(&self) -> u64;
+
+    fn get_ack_to_slave(&self) -> impl std::future::Future<Output = Vec<u64>> + Send;
     fn check_replica_follow(&self) -> impl std::future::Future<Output = u32> + Send;
     fn wait_replica(
         &self,
@@ -62,6 +66,9 @@ impl MasterEngine for StoreEngine {
             return;
         }
         self.master_info.write().unwrap().master_repl_offset += offset;
+        let master_offset = self.get_master_offset();
+        // we update the last set offset of the master offset
+        self.set_last_set_offset(master_offset);
     }
     fn get_master_offset(&self) -> u64 {
         if !self.is_master() {
@@ -70,12 +77,28 @@ impl MasterEngine for StoreEngine {
         self.master_info.read().unwrap().master_repl_offset
     }
 
+    // set last set offset
+    fn set_last_set_offset(&self, offset: u64) {
+        if !self.is_master() {
+            return;
+        }
+        self.master_info.write().unwrap().last_set_offset = offset;
+    }
+    fn get_last_set_offset(&self) -> u64 {
+        if !self.is_master() {
+            return 0;
+        }
+        self.master_info.read().unwrap().last_set_offset
+    }
+
     fn set_slave_node(&self, host: String, stream_port: String, handshake_state: HandshakeState) {
         let mut slave = SlaveInfo {
             host: host.clone(),
             port: stream_port,
             master_replid: self.get_master_id(),
             slave_repl_offset: 0,
+            slave_ping_count: 0,
+            slave_ack_count: 0,
             handshake_state,
         };
 
@@ -89,6 +112,8 @@ impl MasterEngine for StoreEngine {
             Some(old_slave) => {
                 slave.port = old_slave.port.clone();
                 slave.slave_repl_offset = old_slave.slave_repl_offset;
+                slave.slave_ping_count = old_slave.slave_ping_count;
+                slave.slave_ack_count = old_slave.slave_ack_count;
             }
             None => {}
         }
@@ -156,11 +181,12 @@ impl MasterEngine for StoreEngine {
         if !self.is_master() {
             return Err(anyhow::anyhow!("err: not master"));
         }
-        let get_ack_cmd = array_to_resp_array(vec![
-            "REPLCONF".to_string(),
-            "GETACK".to_string(),
-            "*".to_string(),
-        ]);
+        // let get_ack_cmd = array_to_resp_array(vec![
+        //     "REPLCONF".to_string(),
+        //     "GETACK".to_string(),
+        //     "*".to_string(),
+        // ]);
+        let ping_cmd = array_to_resp_array(vec!["PING".to_string()]);
 
         loop {
             let mut slave_list = self.master_info.read().unwrap().slave_list.clone();
@@ -170,9 +196,10 @@ impl MasterEngine for StoreEngine {
                     // send command to slave
                     if let Some(stream) = self.replicas.read().await.get(&host.clone()) {
                         let mut stream = stream.lock().await;
-                        match stream.write_all(&get_ack_cmd.as_bytes()).await {
+                        match stream.write_all(&ping_cmd.as_bytes()).await {
                             Ok(_) => {
                                 println!("sent healthcheck to slave: {}", host);
+                                slave.slave_ping_count += 1;
                             }
                             Err(e) => {
                                 println!("err: {}", e);
@@ -203,10 +230,45 @@ impl MasterEngine for StoreEngine {
             .sum()
     }
 
+    async fn get_ack_to_slave(&self) -> Vec<u64> {
+        let mut ack_count = Vec::new();
+        let mut slave_list = self.master_info.read().unwrap().slave_list.clone();
+
+        for (host, slave) in slave_list.iter_mut() {
+            if slave.handshake_state == HandshakeState::Psync {
+                let get_ack_cmd = array_to_resp_array(vec![
+                    "REPLCONF".to_string(),
+                    "GETACK".to_string(),
+                    "*".to_string(),
+                ]);
+                // send command to slave
+                if let Some(stream) = self.replicas.read().await.get(&host.clone()) {
+                    let mut stream = stream.lock().await;
+                    match stream.write_all(&get_ack_cmd.as_bytes()).await {
+                        Ok(_) => {
+                            println!("sent getack to slave: {}", host);
+                            slave.slave_ack_count += 1;
+                        }
+                        Err(e) => {
+                            println!("err: {}", e);
+                        }
+                    }
+                }
+            }
+            ack_count.push(100 as u64);
+        }
+        ack_count
+    }
     async fn check_replica_follow(&self) -> u32 {
         let mut count = 0;
         // iterate slave list to run replconf getack * to verify the replica's offset has reached the last set offset
-
+        let slave_offsets = self.get_ack_to_slave().await;
+        let last_set_offset = self.get_last_set_offset();
+        for offset in slave_offsets.iter() {
+            if offset >= &last_set_offset {
+                count += 1;
+            }
+        }
         count
     }
 

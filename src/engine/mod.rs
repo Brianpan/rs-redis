@@ -64,6 +64,7 @@ pub enum CommandHandlerResponse {
         message: Vec<Vec<u8>>,
         cmd: String,
     },
+    GetAck(Vec<Vec<u8>>),
     Wait {
         _message: Vec<Vec<u8>>,
         wait_time: u64,

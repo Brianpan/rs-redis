@@ -27,6 +27,7 @@ pub struct NodeInfo {
 pub struct MasterInfo {
     master_replid: String,
     master_repl_offset: u64,
+    last_set_offset: u64,
     pub handshake_state: HandshakeState,
     slave_list: HashMap<String, SlaveInfo>,
 }
@@ -37,6 +38,8 @@ pub struct SlaveInfo {
     pub port: String,
     master_replid: String,
     slave_repl_offset: u64,
+    slave_ping_count: u64,
+    slave_ack_count: u64,
     pub handshake_state: HandshakeState,
 }
 
@@ -53,6 +56,7 @@ impl Default for MasterInfo {
         MasterInfo {
             master_replid: MYID.to_string(),
             master_repl_offset: 0,
+            last_set_offset: 0,
             handshake_state: HandshakeState::Ping,
             slave_list: HashMap::new(),
         }
@@ -66,6 +70,8 @@ impl Default for SlaveInfo {
             port: String::new(),
             master_replid: "?".to_string(),
             slave_repl_offset: 0,
+            slave_ping_count: 0,
+            slave_ack_count: 0,
             handshake_state: HandshakeState::Ping,
         }
     }

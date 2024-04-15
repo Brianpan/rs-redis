@@ -150,6 +150,7 @@ pub fn handle_replica(
     let mut resp_vec = Vec::new();
 
     let ret = RESP_OK;
+    let mut is_getack = false;
 
     if cmd.read().unwrap().vec_data.len() > 2 {
         let host = cmd.read().unwrap().remote_addr.clone();
@@ -176,12 +177,17 @@ pub fn handle_replica(
                     "*".to_string(),
                 ]);
                 resp_vec.push(ack_cmd.as_bytes().to_vec());
+                is_getack = true;
             }
             _ => {}
         }
     }
 
-    Ok(CommandHandlerResponse::Basic(resp_vec))
+    if is_getack {
+        Ok(CommandHandlerResponse::GetAck(resp_vec))
+    } else {
+        Ok(CommandHandlerResponse::Basic(resp_vec))
+    }
 }
 
 pub fn handle_wait(
