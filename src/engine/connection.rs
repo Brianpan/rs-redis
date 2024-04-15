@@ -153,5 +153,19 @@ async fn command_handler_callback(
                 stream.lock().await.write_all(&resp).await.unwrap();
             }
         }
+        CommandHandlerResponse::Wait {
+            message,
+            wait_count,
+            wait_time,
+        } => {
+            let replicator_follow_count = actor.wait_op(wait_count, wait_time).await;
+            let ret = format!(":{}\r\n", replicator_follow_count);
+            stream
+                .lock()
+                .await
+                .write_all(&ret.as_bytes())
+                .await
+                .unwrap();
+        }
     }
 }

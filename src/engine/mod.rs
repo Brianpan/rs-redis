@@ -52,8 +52,19 @@ pub enum RespCommandType {
 
 pub enum CommandHandlerResponse {
     Basic(Vec<Vec<u8>>),
-    Psync { message: Vec<Vec<u8>>, host: String },
-    Replica { message: Vec<Vec<u8>>, cmd: String },
+    Psync {
+        message: Vec<Vec<u8>>,
+        host: String,
+    },
+    Replica {
+        message: Vec<Vec<u8>>,
+        cmd: String,
+    },
+    Wait {
+        message: Vec<Vec<u8>>,
+        wait_time: u64,
+        wait_count: u64,
+    },
 }
 
 #[derive(PartialEq, Clone)]

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::OwnedWriteHalf;
 use tokio::sync::Mutex;
+use tokio::time::{interval, sleep, Duration};
 
 pub trait MasterEngine {
     fn get_master_id(&self) -> String {
@@ -14,6 +15,10 @@ pub trait MasterEngine {
     fn is_master(&self) -> bool {
         return false;
     }
+
+    fn add_master_offset(&self, offset: u64);
+    fn get_master_offset(&self) -> u64;
+
     fn set_slave_node(&self, _host: String, stream_port: String, _handshake_state: HandshakeState);
     fn get_slave_node(&self, host: String) -> Option<SlaveInfo>;
 
@@ -32,6 +37,14 @@ pub trait MasterEngine {
     fn healthcheck_to_slave(&self) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
 
     fn get_connected_replica_count(&self) -> u32;
+
+    // to collect wait time and count
+    fn check_replica_follow(&self) -> impl std::future::Future<Output = u32> + Send;
+    fn wait_replica(
+        &self,
+        wait_count: u64,
+        wait_time: u64,
+    ) -> impl std::future::Future<Output = u32> + Send;
 }
 
 impl MasterEngine for StoreEngine {
@@ -41,6 +54,14 @@ impl MasterEngine for StoreEngine {
 
     fn is_master(&self) -> bool {
         self.get_replica() == ReplicaType::Master
+    }
+
+    // offset operations for set only
+    fn add_master_offset(&self, offset: u64) {
+        self.master_info.write().unwrap().master_repl_offset += offset;
+    }
+    fn get_master_offset(&self) -> u64 {
+        self.master_info.read().unwrap().master_repl_offset
     }
 
     fn set_slave_node(&self, host: String, stream_port: String, handshake_state: HandshakeState) {
@@ -174,5 +195,39 @@ impl MasterEngine for StoreEngine {
                 }
             })
             .sum()
+    }
+
+    async fn check_replica_follow(&self) -> u32 {
+        let mut count = 0;
+        // iterate slave list to run replconf getack * to verify the replica's offset has reached the last set offset
+
+        count
+    }
+
+    async fn wait_replica(&self, wait_count: u64, wait_time: u64) -> u32 {
+        let mut count = 0;
+        let mut ticker = interval(Duration::from_millis(20));
+        // let timeout = sleep(Duration::from_millis(wait_time));
+        // [TBD] offset counting
+        println!("wait_replica: {} {}", wait_time, wait_count);
+
+        loop {
+            tokio::select! {
+                _ = sleep(Duration::from_millis(wait_time)) => {
+                    count = 100;
+                    break;
+                },
+                _ = async {
+                    loop {
+                        ticker.tick().await;
+                        println!("tick");
+                    }
+                } => {},
+                else => {
+                    println!("else");
+                },
+            };
+        }
+        count
     }
 }

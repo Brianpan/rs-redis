@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use super::{
     array_to_resp_array, string_to_bulk_string, string_to_bulk_string_for_psync,
-    CommandHandlerResponse, RespMessage, EMPTY_RDB, MYID, RESP_OK,
+    CommandHandlerResponse, RespMessage, EMPTY_RDB, MYID, RESP_ERR, RESP_OK,
 };
 
 use crate::store::engine::StoreEngine;
@@ -60,6 +60,47 @@ pub fn handle_info(
 
     resp_vec.push(ret.as_bytes().to_vec());
     Ok(CommandHandlerResponse::Basic(resp_vec))
+}
+
+pub fn handle_set(
+    db: &Arc<StoreEngine>,
+    cmd: Arc<RwLock<RespMessage>>,
+) -> Result<CommandHandlerResponse> {
+    let mut resp_vec = Vec::new();
+
+    let key = cmd.read().unwrap().vec_data[1].str_data.clone();
+
+    // no value included
+    if cmd.read().unwrap().vec_data.len() < 3 {
+        resp_vec.push(RESP_ERR.to_string().as_bytes().to_vec());
+    }
+
+    let val = cmd.read().unwrap().vec_data[2].str_data.clone();
+    let cmd_len = cmd.read().unwrap().vec_data.len();
+
+    let mut repl_command = format!("SET {} {}", key.clone(), val.clone());
+
+    if cmd_len == 5 && cmd.read().unwrap().vec_data[3].str_data.to_lowercase() == "px" {
+        let ttl = cmd.read().unwrap().vec_data[4]
+            .str_data
+            .parse::<u128>()
+            .unwrap();
+        db.set_with_expire(key.clone(), val.clone(), ttl);
+        repl_command.push_str(format!(" {}", ttl.clone()).as_str());
+    } else {
+        db.set(key.clone(), val.clone());
+    }
+
+    resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());
+
+    if db.should_sync_command() {
+        Ok(CommandHandlerResponse::Replica {
+            message: resp_vec,
+            cmd: repl_command,
+        })
+    } else {
+        Ok(CommandHandlerResponse::Basic(resp_vec))
+    }
 }
 
 pub fn handle_psync(
@@ -131,16 +172,29 @@ pub fn handle_replica(
 
 pub fn handle_wait(
     db: &Arc<StoreEngine>,
-    _cmd: Arc<RwLock<RespMessage>>,
+    cmd: Arc<RwLock<RespMessage>>,
 ) -> Result<CommandHandlerResponse> {
     // let mut resp_vec = Vec::new();
-
-    // if cmd.read().unwrap().vec_data.len() > 1 {
-    //     let timeout = cmd.read().unwrap().vec_data[1].str_data.clone();
-    //     resp_vec.push(ret.to_string().as_bytes().to_vec());
-    // }
+    let mut timeout: u64 = 0;
+    let mut count: u64 = 0;
+    if cmd.read().unwrap().vec_data.len() > 2 {
+        timeout = cmd.read().unwrap().vec_data[1]
+            .str_data
+            .clone()
+            .parse::<u64>()
+            .unwrap();
+        count = cmd.read().unwrap().vec_data[2]
+            .str_data
+            .clone()
+            .parse::<u64>()
+            .unwrap();
+    }
 
     let ret = format!(":{}\r\n", db.get_connected_replica_count());
 
-    Ok(CommandHandlerResponse::Basic(vec![ret.as_bytes().to_vec()]))
+    Ok(CommandHandlerResponse::Wait {
+        message: vec![ret.as_bytes().to_vec()],
+        wait_count: count,
+        wait_time: timeout,
+    })
 }

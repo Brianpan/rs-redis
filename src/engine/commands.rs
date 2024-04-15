@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use super::handler::{handle_info, handle_psync, handle_replica, handle_wait};
+use super::handler::{handle_info, handle_psync, handle_replica, handle_set, handle_wait};
 use super::{
     CommandHandlerResponse, RespMessage, RespType, RESP_EMPTY, RESP_ERR, RESP_OK, RESP_PONG,
 };
@@ -84,44 +84,7 @@ pub fn command_handler(
                             }
                             Ok(CommandHandlerResponse::Basic(resp_vec))
                         }
-                        COMMAND_SET => {
-                            let db = db.clone();
-                            let key = cmd.read().unwrap().vec_data[1].str_data.clone();
-
-                            // no value included
-                            if cmd.read().unwrap().vec_data.len() < 3 {
-                                resp_vec.push(RESP_ERR.to_string().as_bytes().to_vec());
-                            }
-
-                            let val = cmd.read().unwrap().vec_data[2].str_data.clone();
-                            let cmd_len = cmd.read().unwrap().vec_data.len();
-
-                            let mut repl_command = format!("SET {} {}", key.clone(), val.clone());
-
-                            if cmd_len == 5
-                                && cmd.read().unwrap().vec_data[3].str_data.to_lowercase() == "px"
-                            {
-                                let ttl = cmd.read().unwrap().vec_data[4]
-                                    .str_data
-                                    .parse::<u128>()
-                                    .unwrap();
-                                db.set_with_expire(key.clone(), val.clone(), ttl);
-                                repl_command.push_str(format!(" {}", ttl.clone()).as_str());
-                            } else {
-                                db.set(key.clone(), val.clone());
-                            }
-
-                            resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());
-
-                            if db.should_sync_command() {
-                                Ok(CommandHandlerResponse::Replica {
-                                    message: resp_vec,
-                                    cmd: repl_command,
-                                })
-                            } else {
-                                Ok(CommandHandlerResponse::Basic(resp_vec))
-                            }
-                        }
+                        COMMAND_SET => handle_set(&db.clone(), cmd.clone()),
                         COMMAND_PING => {
                             resp_vec.push(RESP_PONG.to_string().as_bytes().to_vec());
                             Ok(CommandHandlerResponse::Basic(resp_vec))

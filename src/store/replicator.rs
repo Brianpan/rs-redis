@@ -8,6 +8,11 @@ pub enum ReplicatorActorMessage {
         cmd: String,
         respond_to: oneshot::Sender<bool>,
     },
+    Wait {
+        wait_count: u64,
+        wait_time: u64,
+        respond_to: oneshot::Sender<u32>,
+    },
 }
 pub struct ReplicatorActor {
     db: Arc<StoreEngine>,
@@ -28,6 +33,14 @@ impl ReplicatorActor {
             ReplicatorActorMessage::SetOp { cmd, respond_to } => {
                 let _ = self.db.sync_command(cmd).await;
                 let _ = respond_to.send(true);
+            }
+            ReplicatorActorMessage::Wait {
+                wait_time,
+                wait_count,
+                respond_to,
+            } => {
+                let count = self.db.wait_replica(wait_time, wait_count).await;
+                let _ = respond_to.send(count);
             }
         }
     }
@@ -52,6 +65,19 @@ impl ReplicatorHandle {
         let (tx, rx) = oneshot::channel();
         let msg = ReplicatorActorMessage::SetOp {
             cmd,
+            respond_to: tx,
+        };
+
+        let _ = self.sender.send(msg).await;
+
+        rx.await.expect("Failed to receive response")
+    }
+
+    pub async fn wait_op(&self, wait_count: u64, wait_time: u64) -> u32 {
+        let (tx, rx) = oneshot::channel();
+        let msg = ReplicatorActorMessage::Wait {
+            wait_count,
+            wait_time,
             respond_to: tx,
         };
 
