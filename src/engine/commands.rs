@@ -7,7 +7,6 @@ use super::{
 
 use super::string_to_bulk_string;
 use crate::store::engine::StoreEngine;
-use crate::store::master_engine::MasterEngine;
 use anyhow::Result;
 
 // command consts

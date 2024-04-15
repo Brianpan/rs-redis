@@ -58,9 +58,15 @@ impl MasterEngine for StoreEngine {
 
     // offset operations for set only
     fn add_master_offset(&self, offset: u64) {
+        if !self.is_master() {
+            return;
+        }
         self.master_info.write().unwrap().master_repl_offset += offset;
     }
     fn get_master_offset(&self) -> u64 {
+        if !self.is_master() {
+            return 0;
+        }
         self.master_info.read().unwrap().master_repl_offset
     }
 
@@ -209,20 +215,25 @@ impl MasterEngine for StoreEngine {
         let mut ticker = interval(Duration::from_millis(20));
         // let timeout = sleep(Duration::from_millis(wait_time));
         // [TBD] offset counting
-        println!("wait_replica: {} {}", wait_time, wait_count);
 
         loop {
             tokio::select! {
                 _ = sleep(Duration::from_millis(wait_time)) => {
-                    count = 100;
+                    count = self.check_replica_follow().await;
                     break;
                 },
                 _ = async {
                     loop {
                         ticker.tick().await;
-                        println!("tick");
+                        // execute check replica follow
+                        count = self.check_replica_follow().await;
+                        if u64::from(count) >= wait_count {
+                            break;
+                        }
                     }
-                } => {},
+                } => {
+                    break;
+                },
                 else => {
                     println!("else");
                 },

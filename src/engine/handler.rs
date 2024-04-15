@@ -1,8 +1,9 @@
 use std::sync::{Arc, RwLock};
 
 use super::{
-    array_to_resp_array, string_to_bulk_string, string_to_bulk_string_for_psync,
-    CommandHandlerResponse, RespMessage, EMPTY_RDB, MYID, RESP_ERR, RESP_OK,
+    array_to_resp_array, count_resp_command_type_offset, string_to_bulk_string,
+    string_to_bulk_string_for_psync, CommandHandlerResponse, RespCommandType, RespMessage,
+    EMPTY_RDB, MYID, RESP_ERR, RESP_OK,
 };
 
 use crate::store::engine::StoreEngine;
@@ -68,6 +69,9 @@ pub fn handle_set(
 ) -> Result<CommandHandlerResponse> {
     let mut resp_vec = Vec::new();
 
+    // master node to memorize the offset from set command
+    let offset;
+
     let key = cmd.read().unwrap().vec_data[1].str_data.clone();
 
     // no value included
@@ -87,8 +91,15 @@ pub fn handle_set(
             .unwrap();
         db.set_with_expire(key.clone(), val.clone(), ttl);
         repl_command.push_str(format!(" {}", ttl.clone()).as_str());
+
+        offset = count_resp_command_type_offset(RespCommandType::SetPx(
+            key.clone(),
+            val.clone(),
+            ttl.try_into().unwrap(),
+        ));
     } else {
         db.set(key.clone(), val.clone());
+        offset = count_resp_command_type_offset(RespCommandType::Set(key.clone(), val.clone()));
     }
 
     resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());
@@ -99,7 +110,10 @@ pub fn handle_set(
             cmd: repl_command,
         })
     } else {
-        Ok(CommandHandlerResponse::Basic(resp_vec))
+        Ok(CommandHandlerResponse::Set {
+            message: resp_vec,
+            offset: offset as u64,
+        })
     }
 }
 
@@ -193,7 +207,7 @@ pub fn handle_wait(
     let ret = format!(":{}\r\n", db.get_connected_replica_count());
 
     Ok(CommandHandlerResponse::Wait {
-        message: vec![ret.as_bytes().to_vec()],
+        _message: vec![ret.as_bytes().to_vec()],
         wait_count: count,
         wait_time: timeout,
     })

@@ -139,6 +139,13 @@ async fn command_handler_callback(
                 stream.lock().await.write_all(&resp).await.unwrap();
             }
         }
+        CommandHandlerResponse::Set { message, offset } => {
+            db.add_master_offset(offset);
+
+            for resp in message {
+                stream.lock().await.write_all(&resp).await.unwrap();
+            }
+        }
         CommandHandlerResponse::Psync { message, host } => {
             // we need to store stream to replicas
             db.set_replicas(host, stream.clone()).await;
@@ -154,7 +161,7 @@ async fn command_handler_callback(
             }
         }
         CommandHandlerResponse::Wait {
-            message,
+            _message,
             wait_count,
             wait_time,
         } => {

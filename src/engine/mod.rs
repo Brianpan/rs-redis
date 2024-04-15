@@ -52,6 +52,10 @@ pub enum RespCommandType {
 
 pub enum CommandHandlerResponse {
     Basic(Vec<Vec<u8>>),
+    Set {
+        message: Vec<Vec<u8>>,
+        offset: u64,
+    },
     Psync {
         message: Vec<Vec<u8>>,
         host: String,
@@ -61,7 +65,7 @@ pub enum CommandHandlerResponse {
         cmd: String,
     },
     Wait {
-        message: Vec<Vec<u8>>,
+        _message: Vec<Vec<u8>>,
         wait_time: u64,
         wait_count: u64,
     },
