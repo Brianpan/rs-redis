@@ -69,9 +69,13 @@ impl MasterEngine for StoreEngine {
         self.master_info.write().unwrap().master_repl_offset += offset;
         let master_offset = self.get_master_offset();
 
-        println!("add_master_offset master offset: {}", master_offset);
         // we update the last set offset of the master offset
         self.set_last_set_offset(master_offset);
+
+        println!(
+            "add_master_offset master offset: {}",
+            self.get_last_set_offset()
+        );
     }
     fn get_master_offset(&self) -> u64 {
         if !self.is_master() {
@@ -159,7 +163,7 @@ impl MasterEngine for StoreEngine {
             .slave_list
             .insert(host.clone(), new_slave);
 
-        println!("new slave offset: {} {}", host, new_slave.offset);
+        println!("new slave offset: {} {}", host, new_slave.slave_repl_offset);
     }
 
     fn should_sync_command(&self) -> bool {
