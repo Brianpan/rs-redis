@@ -342,6 +342,7 @@ impl MasterEngine for StoreEngine {
         // the master offset is updated. then, we need to send another ack to the slaves
         if master_offset != last_send_offset {
             self.send_ack_to_slave().await;
+            self.set_last_send_offset(master_offset);
         }
 
         // iterate slave list to run replconf getack * to verify the replica's offset has reached the last set offset
