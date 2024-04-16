@@ -68,6 +68,8 @@ impl MasterEngine for StoreEngine {
         }
         self.master_info.write().unwrap().master_repl_offset += offset;
         let master_offset = self.get_master_offset();
+
+        println!("add_master_offset master offset: {}", master_offset);
         // we update the last set offset of the master offset
         self.set_last_set_offset(master_offset);
     }
@@ -271,7 +273,7 @@ impl MasterEngine for StoreEngine {
                         Ok(_) => {
                             // here we need to wait for the ack from the slave
                             let mut offset = slave.slave_repl_offset;
-                            println!("sent getack to slave: {} {}", host, offset);
+                            // println!("sent getack to slave: {} {}", host, offset);
 
                             offset -= slave.slave_ack_count * PING_LEN as u64
                                 + slave.slave_ping_count * REPL_GETACK_LEN as u64;
@@ -295,10 +297,10 @@ impl MasterEngine for StoreEngine {
         // iterate slave list to run replconf getack * to verify the replica's offset has reached the last set offset
         let slave_offsets = self.get_ack_to_slave().await;
         let last_set_offset = self.get_last_set_offset();
-        println!(
-            "ack_list: {:?}, last_set_offset: {}",
-            slave_offsets, last_set_offset
-        );
+        // println!(
+        //     "ack_list: {:?}, last_set_offset: {}",
+        //     slave_offsets, last_set_offset
+        // );
 
         for offset in slave_offsets.iter() {
             if offset >= &last_set_offset {

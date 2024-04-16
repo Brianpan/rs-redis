@@ -104,6 +104,8 @@ pub fn handle_set(
 
     resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());
 
+    println!("set offset {}", offset);
+
     if db.should_sync_command() {
         Ok(CommandHandlerResponse::Replica {
             message: resp_vec,
