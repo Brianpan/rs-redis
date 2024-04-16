@@ -334,6 +334,10 @@ impl MasterEngine for StoreEngine {
         let mut count = 0;
         let master_offset = self.get_master_offset();
         let last_send_offset = self.get_last_send_offset();
+        println!(
+            "master_offset: {}, last_send_offset: {}",
+            master_offset, last_send_offset
+        );
 
         // the master offset is updated. then, we need to send another ack to the slaves
         if master_offset != last_send_offset {
