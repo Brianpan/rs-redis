@@ -27,6 +27,7 @@ pub struct NodeInfo {
 pub struct MasterInfo {
     master_replid: String,
     master_repl_offset: u64,
+    last_send_repl_offset: u64,
     last_set_offset: u64,
     pub handshake_state: HandshakeState,
     slave_list: HashMap<String, SlaveInfo>,
@@ -56,6 +57,7 @@ impl Default for MasterInfo {
         MasterInfo {
             master_replid: MYID.to_string(),
             master_repl_offset: 0,
+            last_send_repl_offset: 0,
             last_set_offset: 0,
             handshake_state: HandshakeState::Ping,
             slave_list: HashMap::new(),

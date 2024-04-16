@@ -38,7 +38,7 @@ impl ReplicatorActor {
                 let _ = respond_to.send(true);
             }
             ReplicatorActorMessage::GetAck { respond_to } => {
-                let _ = self.db.get_ack_to_slave().await;
+                let _ = self.db.send_ack_to_slave().await;
                 let _ = respond_to.send(true);
             }
             ReplicatorActorMessage::Wait {

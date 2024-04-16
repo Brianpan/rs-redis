@@ -19,6 +19,9 @@ pub trait MasterEngine {
     fn add_master_offset(&self, offset: u64);
     fn get_master_offset(&self) -> u64;
 
+    fn set_last_send_offset(&self, offset: u64);
+    fn get_last_send_offset(&self) -> u64;
+
     fn set_slave_node(&self, _host: String, stream_port: String, _handshake_state: HandshakeState);
     fn get_slave_node(&self, host: String) -> Option<SlaveInfo>;
     fn set_slave_offset(&self, host: String, offset: u64);
@@ -43,7 +46,9 @@ pub trait MasterEngine {
     fn set_last_set_offset(&self, offset: u64);
     fn get_last_set_offset(&self) -> u64;
 
-    fn get_ack_to_slave(&self) -> impl std::future::Future<Output = Vec<u64>> + Send;
+    fn send_ack_to_slave(&self) -> impl std::future::Future<Output = ()> + Send;
+    fn get_ack_to_slave(&self) -> Vec<u64>;
+
     fn check_replica_follow(&self) -> impl std::future::Future<Output = u32> + Send;
     fn wait_replica(
         &self,
@@ -91,6 +96,19 @@ impl MasterEngine for StoreEngine {
             return 0;
         }
         self.master_info.read().unwrap().last_set_offset
+    }
+
+    fn set_last_send_offset(&self, offset: u64) {
+        if !self.is_master() {
+            return;
+        }
+        self.master_info.write().unwrap().last_send_repl_offset = offset;
+    }
+    fn get_last_send_offset(&self) -> u64 {
+        if !self.is_master() {
+            return 0;
+        }
+        self.master_info.read().unwrap().last_send_repl_offset
     }
 
     fn set_slave_node(&self, host: String, stream_port: String, handshake_state: HandshakeState) {
@@ -258,8 +276,7 @@ impl MasterEngine for StoreEngine {
             .sum()
     }
 
-    async fn get_ack_to_slave(&self) -> Vec<u64> {
-        let mut ack_count = Vec::new();
+    async fn send_ack_to_slave(&self) {
         let mut slave_list = self.master_info.read().unwrap().slave_list.clone();
 
         for (host, slave) in slave_list.iter_mut() {
@@ -275,15 +292,10 @@ impl MasterEngine for StoreEngine {
                     match stream.write_all(&get_ack_cmd.as_bytes()).await {
                         Ok(_) => {
                             // here we need to wait for the ack from the slave
-                            let mut offset = slave.slave_repl_offset;
                             // println!(
                             //     "sent getack to slave: {} {}, {}",
                             //     host, offset, slave.slave_ack_count
                             // );
-
-                            offset -= slave.slave_ack_count * PING_LEN as u64
-                                + slave.slave_ping_count * REPL_GETACK_LEN as u64;
-                            ack_count.push(offset);
 
                             // we send one more ack to slave
                             slave.slave_ack_count += 1;
@@ -295,12 +307,39 @@ impl MasterEngine for StoreEngine {
                 }
             }
         }
+        let master_offset = self.get_master_offset();
+        self.set_last_set_offset(master_offset);
+    }
+
+    fn get_ack_to_slave(&self) -> Vec<u64> {
+        let mut ack_count = Vec::new();
+        let mut slave_list = self.master_info.read().unwrap().slave_list.clone();
+
+        for (_host, slave) in slave_list.iter_mut() {
+            if slave.handshake_state == HandshakeState::Psync {
+                let mut offset = slave.slave_repl_offset;
+
+                offset -= (slave.slave_ack_count - 1) * PING_LEN as u64
+                    + slave.slave_ping_count * REPL_GETACK_LEN as u64;
+                ack_count.push(offset);
+            }
+        }
+
         ack_count
     }
+
     async fn check_replica_follow(&self) -> u32 {
         let mut count = 0;
+        let master_offset = self.get_master_offset();
+        let last_send_offset = self.get_last_send_offset();
+
+        // the master offset is updated. then, we need to send another ack to the slaves
+        if master_offset != last_send_offset {
+            self.send_ack_to_slave().await;
+        }
+
         // iterate slave list to run replconf getack * to verify the replica's offset has reached the last set offset
-        let slave_offsets = self.get_ack_to_slave().await;
+        let slave_offsets = self.get_ack_to_slave();
         let last_set_offset = self.get_last_set_offset();
         println!(
             "ack_list: {:?}, last_set_offset: {}",
