@@ -179,6 +179,17 @@ pub fn handle_replica(
                 resp_vec.push(ack_cmd.as_bytes().to_vec());
                 is_getack = true;
             }
+            "ack" => {
+                if cmd.read().unwrap().vec_data.len() > 2 {
+                    let offset = cmd.read().unwrap().vec_data[2]
+                        .str_data
+                        .clone()
+                        .parse::<u64>()?;
+
+                    db.set_slave_offset(host.clone(), offset.clone());
+                    // resp_vec.push(ret.to_string().as_bytes().to_vec());
+                }
+            }
             _ => {}
         }
     }

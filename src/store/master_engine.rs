@@ -1,6 +1,6 @@
 use super::engine::StoreEngine;
 use super::{HandshakeState, ReplicaType, SlaveInfo};
-use crate::engine::array_to_resp_array;
+use crate::engine::{array_to_resp_array, PING_LEN, REPL_GETACK_LEN};
 // use std::io::prelude::*;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
@@ -21,6 +21,7 @@ pub trait MasterEngine {
 
     fn set_slave_node(&self, _host: String, stream_port: String, _handshake_state: HandshakeState);
     fn get_slave_node(&self, host: String) -> Option<SlaveInfo>;
+    fn set_slave_offset(&self, host: String, offset: u64);
 
     fn should_sync_command(&self) -> bool;
 
@@ -133,6 +134,28 @@ impl MasterEngine for StoreEngine {
             .slave_list
             .get(&host.clone())
             .cloned()
+    }
+    fn set_slave_offset(&self, host: String, offset: u64) {
+        let new_slave;
+        if let Some(slave) = self
+            .master_info
+            .read()
+            .unwrap()
+            .slave_list
+            .get(&host.clone())
+        {
+            let mut slave = slave.clone();
+            slave.slave_repl_offset = offset;
+            new_slave = slave;
+        } else {
+            return;
+        }
+
+        self.master_info
+            .write()
+            .unwrap()
+            .slave_list
+            .insert(host.clone(), new_slave);
     }
 
     fn should_sync_command(&self) -> bool {
@@ -247,6 +270,13 @@ impl MasterEngine for StoreEngine {
                     match stream.write_all(&get_ack_cmd.as_bytes()).await {
                         Ok(_) => {
                             println!("sent getack to slave: {}", host);
+                            // here we need to wait for the ack from the slave
+                            let mut offset = slave.slave_repl_offset;
+                            offset -= slave.slave_ack_count * PING_LEN as u64
+                                + slave.slave_ping_count * REPL_GETACK_LEN as u64;
+                            ack_count.push(offset);
+
+                            // we send one more ack to slave
                             slave.slave_ack_count += 1;
                         }
                         Err(e) => {
@@ -255,7 +285,6 @@ impl MasterEngine for StoreEngine {
                     }
                 }
             }
-            ack_count.push(100 as u64);
         }
         ack_count
     }

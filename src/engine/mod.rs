@@ -13,8 +13,8 @@ const RESP_PONG: &str = "+PONG\r\n";
 const RESP_EMPTY: &str = "*0\r\n";
 
 // hardcoded lenth
-const PING_LEN: usize = 14;
-const REPL_GETACK_LEN: usize = 37;
+pub const PING_LEN: usize = 14;
+pub const REPL_GETACK_LEN: usize = 37;
 
 // preset id of master node (40 chars long)
 // it will be changed to a random value in the future
