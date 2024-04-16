@@ -338,6 +338,7 @@ impl MasterEngine for StoreEngine {
                         }
                     }
                 } => {
+                    println!("left wait loop");
                     break;
                 },
                 else => {
