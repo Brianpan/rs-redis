@@ -161,7 +161,7 @@ impl MasterEngine for StoreEngine {
             .write()
             .unwrap()
             .slave_list
-            .insert(host.clone(), new_slave);
+            .insert(host.clone(), new_slave.clone());
 
         println!("new slave offset: {} {}", host, new_slave.slave_repl_offset);
     }
