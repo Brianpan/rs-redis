@@ -185,8 +185,8 @@ pub fn handle_replica(
                         .str_data
                         .clone()
                         .parse::<u64>()?;
-
-                    db.set_slave_offset(host.clone(), offset.clone());
+                    println!("{} ack offset {}", host.clone(), offset);
+                    db.set_slave_offset(host.clone(), offset);
                     // resp_vec.push(ret.to_string().as_bytes().to_vec());
                 }
             }

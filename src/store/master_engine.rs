@@ -269,9 +269,10 @@ impl MasterEngine for StoreEngine {
                     let mut stream = stream.lock().await;
                     match stream.write_all(&get_ack_cmd.as_bytes()).await {
                         Ok(_) => {
-                            // println!("sent getack to slave: {}", host);
                             // here we need to wait for the ack from the slave
                             let mut offset = slave.slave_repl_offset;
+                            println!("sent getack to slave: {} {}", host, offset);
+
                             offset -= slave.slave_ack_count * PING_LEN as u64
                                 + slave.slave_ping_count * REPL_GETACK_LEN as u64;
                             ack_count.push(offset);
@@ -286,7 +287,7 @@ impl MasterEngine for StoreEngine {
                 }
             }
         }
-        println!("ack_list: {:?}", ack_count);
+
         ack_count
     }
     async fn check_replica_follow(&self) -> u32 {
@@ -294,6 +295,11 @@ impl MasterEngine for StoreEngine {
         // iterate slave list to run replconf getack * to verify the replica's offset has reached the last set offset
         let slave_offsets = self.get_ack_to_slave().await;
         let last_set_offset = self.get_last_set_offset();
+        println!(
+            "ack_list: {:?}, last_set_offset: {}",
+            slave_offsets, last_set_offset
+        );
+
         for offset in slave_offsets.iter() {
             if offset >= &last_set_offset {
                 count += 1;
