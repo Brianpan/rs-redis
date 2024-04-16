@@ -141,6 +141,10 @@ async fn command_handler_callback(
         }
         CommandHandlerResponse::Set { message, offset } => {
             db.add_master_offset(offset);
+            println!(
+                "add_master_offset master offset: {}",
+                db.get_last_set_offset()
+            );
 
             for resp in message {
                 stream.lock().await.write_all(&resp).await.unwrap();

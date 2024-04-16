@@ -71,11 +71,6 @@ impl MasterEngine for StoreEngine {
 
         // we update the last set offset of the master offset
         self.set_last_set_offset(master_offset);
-
-        println!(
-            "add_master_offset master offset: {}",
-            self.get_last_set_offset()
-        );
     }
     fn get_master_offset(&self) -> u64 {
         if !self.is_master() {
@@ -229,7 +224,7 @@ impl MasterEngine for StoreEngine {
                         let mut stream = stream.lock().await;
                         match stream.write_all(&ping_cmd.as_bytes()).await {
                             Ok(_) => {
-                                println!("sent healthcheck to slave: {}", host);
+                                // println!("sent healthcheck to slave: {}", host);
                                 slave.slave_ping_count += 1;
                             }
                             Err(e) => {
@@ -239,6 +234,8 @@ impl MasterEngine for StoreEngine {
                     }
                 }
             }
+            // [TBD] perhaps we shall update the ping count back
+
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         }
 
