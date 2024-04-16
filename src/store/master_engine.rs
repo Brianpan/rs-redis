@@ -295,7 +295,6 @@ impl MasterEngine for StoreEngine {
                 }
             }
         }
-        println!("left get_ack_to_slave loop");
         ack_count
     }
     async fn check_replica_follow(&self) -> u32 {
@@ -303,10 +302,10 @@ impl MasterEngine for StoreEngine {
         // iterate slave list to run replconf getack * to verify the replica's offset has reached the last set offset
         let slave_offsets = self.get_ack_to_slave().await;
         let last_set_offset = self.get_last_set_offset();
-        // println!(
-        //     "ack_list: {:?}, last_set_offset: {}",
-        //     slave_offsets, last_set_offset
-        // );
+        println!(
+            "ack_list: {:?}, last_set_offset: {}",
+            slave_offsets, last_set_offset
+        );
 
         for offset in slave_offsets.iter() {
             if offset >= &last_set_offset {
@@ -338,7 +337,6 @@ impl MasterEngine for StoreEngine {
                         }
                     }
                 } => {
-                    println!("left wait loop");
                     break;
                 },
                 else => {
