@@ -276,10 +276,10 @@ impl MasterEngine for StoreEngine {
                         Ok(_) => {
                             // here we need to wait for the ack from the slave
                             let mut offset = slave.slave_repl_offset;
-                            println!(
-                                "sent getack to slave: {} {}, {}",
-                                host, offset, slave.slave_ack_count
-                            );
+                            // println!(
+                            //     "sent getack to slave: {} {}, {}",
+                            //     host, offset, slave.slave_ack_count
+                            // );
 
                             offset -= slave.slave_ack_count * PING_LEN as u64
                                 + slave.slave_ping_count * REPL_GETACK_LEN as u64;
@@ -295,7 +295,7 @@ impl MasterEngine for StoreEngine {
                 }
             }
         }
-
+        println!("left get_ack_to_slave loop");
         ack_count
     }
     async fn check_replica_follow(&self) -> u32 {
