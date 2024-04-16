@@ -160,10 +160,10 @@ async fn command_handler_callback(
             offset,
         } => {
             db.add_master_offset(offset);
-            println!(
-                "add_master_offset master offset: {}",
-                db.get_last_set_offset()
-            );
+            // println!(
+            //     "add_master_offset master offset: {}",
+            //     db.get_last_set_offset()
+            // );
             let _ = actor.set_op(cmd).await;
             for resp in message {
                 stream.lock().await.write_all(&resp).await.unwrap();
