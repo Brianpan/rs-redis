@@ -277,6 +277,8 @@ impl MasterEngine for StoreEngine {
     }
 
     async fn send_ack_to_slave(&self) {
+        println!("send_ack_to_slave");
+
         let mut slave_list = self.master_info.read().unwrap().slave_list.clone();
 
         for (host, slave) in slave_list.iter_mut() {
