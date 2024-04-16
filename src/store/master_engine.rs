@@ -269,7 +269,7 @@ impl MasterEngine for StoreEngine {
                     let mut stream = stream.lock().await;
                     match stream.write_all(&get_ack_cmd.as_bytes()).await {
                         Ok(_) => {
-                            println!("sent getack to slave: {}", host);
+                            // println!("sent getack to slave: {}", host);
                             // here we need to wait for the ack from the slave
                             let mut offset = slave.slave_repl_offset;
                             offset -= slave.slave_ack_count * PING_LEN as u64
@@ -319,6 +319,7 @@ impl MasterEngine for StoreEngine {
                         // execute check replica follow
                         count = self.check_replica_follow().await;
                         if u64::from(count) >= wait_count {
+                            count = wait_count;
                             break;
                         }
                     }
