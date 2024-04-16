@@ -110,6 +110,7 @@ pub fn handle_set(
         Ok(CommandHandlerResponse::Replica {
             message: resp_vec,
             cmd: repl_command,
+            offset: offset as u64,
         })
     } else {
         Ok(CommandHandlerResponse::Set {

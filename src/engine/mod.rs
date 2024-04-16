@@ -63,6 +63,7 @@ pub enum CommandHandlerResponse {
     Replica {
         message: Vec<Vec<u8>>,
         cmd: String,
+        offset: u64,
     },
     GetAck(Vec<Vec<u8>>),
     Wait {
