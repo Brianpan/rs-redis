@@ -319,7 +319,7 @@ impl MasterEngine for StoreEngine {
                         // execute check replica follow
                         count = self.check_replica_follow().await;
                         if u64::from(count) >= wait_count {
-                            count = wait_count;
+                            count = wait_count as u32;
                             break;
                         }
                     }
