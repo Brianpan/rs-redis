@@ -6,6 +6,7 @@ use super::{
     EMPTY_RDB, MYID, RESP_ERR, RESP_OK,
 };
 
+use crate::rdb::config::RDBConfigOps;
 use crate::store::engine::StoreEngine;
 use crate::store::master_engine::MasterEngine;
 use crate::store::{HandshakeState, ReplicaType};
@@ -231,4 +232,42 @@ pub fn handle_wait(
         wait_count: count,
         wait_time: timeout,
     })
+}
+
+pub fn handle_config(
+    db: &Arc<StoreEngine>,
+    cmd: Arc<RwLock<RespMessage>>,
+) -> Result<CommandHandlerResponse> {
+    let mut resp_vec = Vec::new();
+
+    if cmd.read().unwrap().vec_data.len() > 2 {
+        if cmd.read().unwrap().vec_data[1]
+            .str_data
+            .to_lowercase()
+            .as_str()
+            != "get"
+        {
+            return Err(anyhow::anyhow!("unknown config command"));
+        }
+
+        match cmd.read().unwrap().vec_data[2]
+            .str_data
+            .to_lowercase()
+            .as_str()
+        {
+            "dir" => {
+                let dir_resp = array_to_resp_array(vec![String::from("dir"), db.get_dir()]);
+                resp_vec.push(dir_resp.as_bytes().to_vec());
+            }
+            "dbfilename" => {
+                let dbfilename_resp =
+                    array_to_resp_array(vec![String::from("dbfilename"), db.get_filename()]);
+                resp_vec.push(dbfilename_resp.as_bytes().to_vec());
+            }
+            _ => return Err(anyhow::anyhow!("unknown config command")),
+        }
+        Ok(CommandHandlerResponse::Basic(resp_vec))
+    } else {
+        Err(anyhow::anyhow!("command too short"))
+    }
 }

@@ -1,8 +1,10 @@
 mod engine;
+mod rdb;
 mod store;
 
 use clap::{Arg, Command};
 use engine::connection::handle_connection;
+use rdb::config::RDBConfigOps;
 use std::sync::Arc;
 use store::engine::StoreEngine;
 use store::master_engine::MasterEngine;
@@ -34,6 +36,20 @@ async fn main() -> std::io::Result<()> {
                 .number_of_values(2)
                 .required(false),
         )
+        .arg(
+            Arg::new("dir")
+                .help("directory of the rdb")
+                .long("dir")
+                .value_name("DIR")
+                .required(false),
+        )
+        .arg(
+            Arg::new("dbfilename")
+                .help("filename of the rdb")
+                .long("dbfilename")
+                .value_name("DBFILENAME")
+                .required(false),
+        )
         .get_matches();
 
     let binding = DEFAULT_PORT.to_string();
@@ -44,6 +60,14 @@ async fn main() -> std::io::Result<()> {
     let db = Arc::new(StoreEngine::new());
 
     db.set_node_info(redis_port.clone());
+
+    if let Some(dir) = args.get_one::<String>("dir") {
+        db.set_dir(dir.clone());
+    }
+
+    if let Some(filename) = args.get_one::<String>("dbfilename") {
+        db.set_filename(filename.clone());
+    }
 
     // collect replicaof argument
     if let Some(replica_info) = args.get_many::<String>("replicaof") {

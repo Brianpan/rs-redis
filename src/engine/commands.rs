@@ -1,6 +1,8 @@
 use std::sync::{Arc, RwLock};
 
-use super::handler::{handle_info, handle_psync, handle_replica, handle_set, handle_wait};
+use super::handler::{
+    handle_config, handle_info, handle_psync, handle_replica, handle_set, handle_wait,
+};
 use super::{
     CommandHandlerResponse, RespMessage, RespType, RESP_EMPTY, RESP_ERR, RESP_OK, RESP_PONG,
 };
@@ -18,6 +20,7 @@ const COMMAND_INFO: &str = "info";
 const COMMAND_REPLCONF: &str = "replconf";
 const COMMAND_PSYNC: &str = "psync";
 const COMMAND_WAIT: &str = "wait";
+const COMMAND_CONFIG: &str = "config";
 
 // we support multiple responses to handle commands like psync
 pub fn command_handler(
@@ -104,6 +107,7 @@ pub fn command_handler(
                         COMMAND_REPLCONF => handle_replica(&db.clone(), cmd.clone()),
                         // psync return from master node with fullresync and myid
                         COMMAND_PSYNC => handle_psync(&db.clone(), cmd.clone()),
+                        COMMAND_CONFIG => handle_config(&db.clone(), cmd.clone()),
                         _ => {
                             resp_vec.push(RESP_EMPTY.to_string().as_bytes().to_vec());
                             Ok(CommandHandlerResponse::Basic(resp_vec))

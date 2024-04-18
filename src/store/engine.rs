@@ -6,8 +6,8 @@ use std::cmp::Reverse;
 use std::collections::HashMap;
 use tokio::net::tcp::OwnedWriteHalf;
 // use std::io::prelude::*;
-use std::sync::Arc;
-use std::sync::RwLock;
+use crate::rdb::RdbConf;
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::*;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::net::TcpStream;
@@ -21,6 +21,7 @@ pub struct StoreEngine {
     dict: RwLock<HashMap<String, String>>,
     expiring_queue: RwLock<PriorityQueue<String, Reverse<u128>>>,
     node_info: RwLock<NodeInfo>,
+    pub rdb_info: Mutex<RdbConf>,
     pub replica_info: RwLock<ReplicaType>,
     pub master_info: RwLock<MasterInfo>,
     pub slave_info: RwLock<SlaveInfo>,
@@ -31,6 +32,7 @@ impl StoreEngine {
     pub fn new() -> Self {
         StoreEngine {
             dict: RwLock::new(HashMap::new()),
+            rdb_info: Mutex::new(RdbConf::default()),
             expiring_queue: RwLock::new(PriorityQueue::new()),
             replica_info: RwLock::new(ReplicaType::Master),
             node_info: RwLock::new(NodeInfo::default()),
