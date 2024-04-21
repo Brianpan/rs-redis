@@ -1,4 +1,5 @@
 pub mod config;
+pub mod loader;
 
 pub struct RdbConf {
     dir: String,
