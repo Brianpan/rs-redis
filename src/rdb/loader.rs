@@ -14,14 +14,15 @@ enum RDBParseResult {
     Err,
 }
 
-#[derive(PartialEq)]
-enum RDBParseType {
+#[derive(PartialEq, Debug)]
+pub enum RDBParseType {
     None,
     Aux(HashMap<String, String>),
     DB(),
 }
 
-struct RDBParseState {
+#[derive(Debug)]
+pub struct RDBParseState {
     parse_type: RDBParseType,
     is_finished: bool,
 }
@@ -31,9 +32,10 @@ pub trait RDBLoader {
     fn parse<R: Read>(&self, reader: &mut R) -> Result<bool>;
     fn verify_magic<R: Read>(&self, reader: &mut R) -> bool;
     fn verify_version<R: Read>(&self, reader: &mut R) -> bool;
-    fn verify_aux<R: Read>(&self, reader: &mut R) -> RDBParseState;
+    fn verify_aux<R: Read>(&self, reader: &mut R) -> Result<RDBParseState>;
 
     fn parse_length_encoding<R: Read>(&self, reader: &mut R) -> Result<(usize, bool)>;
+    fn parse_string_encoding<R: Read>(&self, reader: &mut R) -> Result<String>;
 }
 
 impl RDBLoader for StoreEngine {
@@ -63,7 +65,8 @@ impl RDBLoader for StoreEngine {
             match next_op {
                 op_code::AUX => {
                     println!("aux");
-                    let _ = self.verify_aux(reader);
+                    let aux = self.verify_aux(reader)?;
+                    println!("aux: {:?}", aux);
                 }
                 op_code::EXPIRETIME => {
                     println!("expiretime");
@@ -125,13 +128,18 @@ impl RDBLoader for StoreEngine {
         true
     }
 
-    fn verify_aux<R: Read>(&self, reader: &mut R) -> RDBParseState {
-        let aux = HashMap::new();
+    fn verify_aux<R: Read>(&self, reader: &mut R) -> Result<RDBParseState> {
+        let mut aux = HashMap::new();
 
-        RDBParseState {
+        let k = self.parse_string_encoding(reader)?;
+        let v = self.parse_string_encoding(reader)?;
+
+        aux.insert(k, v);
+
+        Ok(RDBParseState {
             parse_type: RDBParseType::Aux(aux),
             is_finished: true,
-        }
+        })
     }
 
     fn parse_length_encoding<R: Read>(&self, reader: &mut R) -> Result<(usize, bool)> {
@@ -146,7 +154,7 @@ impl RDBLoader for StoreEngine {
             }
             length_encode_code::FORTEEN_BITS => {
                 let next_byte = reader.read_u8()?;
-                length = (((enc_type & 0x3F) << 8) as usize) + next_byte as usize;
+                length = (((enc_type & 0x3F) as usize) << 8) | next_byte as usize;
             }
             // least byte isn't the lowest
             length_encode_code::FOUR_BYTES => {
@@ -161,6 +169,60 @@ impl RDBLoader for StoreEngine {
         }
 
         Ok((length, is_encode))
+    }
+
+    fn parse_string_encoding<R: Read>(&self, reader: &mut R) -> Result<String> {
+        let (length, encoding) = self.parse_length_encoding(reader)?;
+
+        // encoding case
+        if encoding {
+            return match length {
+                // 8 bits interger
+                0 => {
+                    let i = reader.read_u8()?;
+                    Ok(format!("{}", i))
+                }
+                // 16 bits integer
+                1 => {
+                    let i = reader.read_u16::<LittleEndian>()?;
+                    Ok(format!("{}", i))
+                }
+                // 32 bits integer
+                2 => {
+                    let i = reader.read_u32::<LittleEndian>()?;
+                    Ok(format!("{}", i))
+                }
+                // compressed string
+                3 => Ok(String::from("")),
+                _ => {
+                    return Err(anyhow::anyhow!("not suppoerted"));
+                }
+            };
+        }
+
+        let mut buf = [0; 1024];
+        // take limits of the length
+        let mut handle = reader.take(length as u64);
+        let mut remain = length;
+        let mut s = String::new();
+        loop {
+            if remain <= 0 {
+                break;
+            }
+
+            match handle.read(&mut buf) {
+                Ok(n) => {
+                    remain -= n;
+                    let s1 = str::from_utf8(&buf[..n])?;
+                    s = format!("{}{}", s, s1);
+                }
+                Err(_) => {
+                    return Err(anyhow::anyhow!("error when parsing string"));
+                }
+            }
+        }
+
+        Ok(s)
     }
 }
 
