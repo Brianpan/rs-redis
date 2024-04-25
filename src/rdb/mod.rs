@@ -15,7 +15,24 @@ impl Default for RdbConf {
     }
 }
 
+#[allow(dead_code)]
+pub mod value_type {
+    pub const STRING: u8 = 0;
+    pub const LIST: u8 = 1;
+    pub const SET: u8 = 2;
+    pub const SORTED_SET: u8 = 3;
+    pub const HASH: u8 = 4;
+    pub const ZIPMAP: u8 = 9;
+    pub const ZIPLIST: u8 = 10;
+    pub const INTSET: u8 = 11;
+    pub const SORTED_SET_ZIPLIST: u8 = 12;
+    pub const HASH_ZIPLIST: u8 = 13;
+    pub const LIST_QUICKLIST: u8 = 14;
+}
+
 pub mod op_code {
+    pub const STRING: u8 = 0;
+
     pub const AUX: u8 = 250;
     pub const RESIZEDB: u8 = 251;
     pub const EXPIRETIME_MS: u8 = 252;
