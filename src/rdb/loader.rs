@@ -109,7 +109,9 @@ impl RDBLoader for StoreEngine {
                 op_code::STRING => {
                     let key = self.parse_string_encoding(reader)?;
                     let value = self.parse_string_encoding(reader)?;
-                    println!("key: {}, {}", key, value);
+                    // println!("key: {}, {}", key, value);
+                    // put k,v into  db
+                    self.set(key, value);
                 }
                 1_u8..=14_u8 => {
                     // parsing type

@@ -92,6 +92,16 @@ impl StoreEngine {
             .push(key, Reverse(expired_ms));
     }
 
+    pub fn get_keys(&self) -> Vec<String> {
+        let mut resp = Vec::new();
+
+        resp = <HashMap<String, String> as Clone>::clone(&self.dict.read().unwrap())
+            .into_keys()
+            .collect();
+
+        resp
+    }
+
     pub async fn expired_reaper(&self) {
         let sleep_time = Duration::from_millis(3);
         loop {

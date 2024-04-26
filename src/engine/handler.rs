@@ -271,3 +271,26 @@ pub fn handle_config(
         Err(anyhow::anyhow!("command too short"))
     }
 }
+
+pub fn handle_keys(
+    db: &Arc<StoreEngine>,
+    cmd: Arc<RwLock<RespMessage>>,
+) -> Result<CommandHandlerResponse> {
+    let mut resp_vec = Vec::new();
+
+    if cmd.read().unwrap().vec_data.len() > 1 {
+        match cmd.read().unwrap().vec_data[1]
+            .str_data
+            .to_lowercase()
+            .as_str()
+        {
+            "*" => {
+                resp_vec.push(array_to_resp_array(db.get_keys()).as_bytes().to_vec());
+            }
+            _ => {}
+        }
+        Ok(CommandHandlerResponse::Basic(resp_vec))
+    } else {
+        Err(anyhow::anyhow!("command too short"))
+    }
+}
