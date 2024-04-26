@@ -61,8 +61,8 @@ impl RDBLoader for StoreEngine {
             return Err(anyhow::anyhow!("no version supported"));
         }
 
-        let mut buf = [0; 1024];
-        let mut parse_state = RDBParseState::default();
+        // let mut buf = [0; 1024];
+        let parse_state = RDBParseState::default();
 
         let mut cur_hash_size = 0;
         let mut cur_expire_hash_size = 0;
@@ -71,15 +71,15 @@ impl RDBLoader for StoreEngine {
             let next_op = reader.read_u8()?;
             match next_op {
                 op_code::AUX => {
-                    println!("aux");
-                    let aux = self.verify_aux(reader)?;
-                    println!("aux: {:?}", aux);
+                    // println!("aux");
+                    let _aux = self.verify_aux(reader)?;
+                    // println!("aux: {:?}", aux);
                 }
                 op_code::EXPIRETIME => {
-                    println!("expiretime");
+                    // println!("expiretime");
                 }
                 op_code::EXPIRETIME_MS => {
-                    println!("expiretime_ms");
+                    // println!("expiretime_ms");
                 }
                 op_code::RESIZEDB => {
                     let state = self.verify_resize_db(reader)?;
@@ -90,7 +90,7 @@ impl RDBLoader for StoreEngine {
                         }
                         _ => {}
                     }
-                    println!("resizedb {} {}", cur_hash_size, cur_expire_hash_size);
+                    // println!("resizedb {} {}", cur_hash_size, cur_expire_hash_size);
                 }
                 op_code::SELECTDB => {
                     let state = self.verify_db_selector(reader)?;
@@ -100,7 +100,7 @@ impl RDBLoader for StoreEngine {
                         }
                         _ => {}
                     }
-                    println!("selectdb {}", curdb);
+                    // println!("selectdb {}", curdb);
                 }
                 op_code::EOF => {
                     break;
@@ -115,10 +115,10 @@ impl RDBLoader for StoreEngine {
                 }
                 1_u8..=14_u8 => {
                     // parsing type
-                    println!("unsupported type");
+                    // println!("unsupported type");
                 }
                 15_u8..=249_u8 => {
-                    println!("no such op code");
+                    // println!("no such op code");
                 }
             }
         }

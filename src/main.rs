@@ -5,6 +5,7 @@ mod store;
 use clap::{Arg, Command};
 use engine::connection::handle_connection;
 use rdb::config::RDBConfigOps;
+use rdb::loader::RDBLoader;
 use std::sync::Arc;
 use store::engine::StoreEngine;
 use store::master_engine::MasterEngine;
@@ -68,6 +69,10 @@ async fn main() -> std::io::Result<()> {
     if let Some(filename) = args.get_one::<String>("dbfilename") {
         db.set_filename(filename.clone());
     }
+
+    // load RDB
+    let full_path = format!("{}/{}", db.get_dir(), db.get_filename());
+    let _ = db.load(full_path).unwrap_or(false);
 
     // collect replicaof argument
     if let Some(replica_info) = args.get_many::<String>("replicaof") {

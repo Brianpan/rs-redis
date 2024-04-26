@@ -93,13 +93,9 @@ impl StoreEngine {
     }
 
     pub fn get_keys(&self) -> Vec<String> {
-        let mut resp = Vec::new();
-
-        resp = <HashMap<String, String> as Clone>::clone(&self.dict.read().unwrap())
+        <HashMap<String, String> as Clone>::clone(&self.dict.read().unwrap())
             .into_keys()
-            .collect();
-
-        resp
+            .collect()
     }
 
     pub async fn expired_reaper(&self) {
