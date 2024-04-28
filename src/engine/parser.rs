@@ -57,7 +57,7 @@ pub fn command_parser(input: &mut [u8]) -> anyhow::Result<Vec<RespCommandType>> 
                     let num = std::str::from_utf8(&input[start..end])
                         .to_owned()?
                         .parse::<usize>()?;
-                    println!("collect number: {}", num);
+                    // println!("collect number: {}", num);
 
                     if iter.next_if_eq(&(end, &('\r' as u8))).is_some()
                         && iter.next_if_eq(&(end + 1, &('\n' as u8))).is_some()
@@ -106,7 +106,7 @@ fn process_command_vec(cmd_vec: Vec<String>) -> RespCommandType {
         return RespCommandType::Error;
     }
 
-    println!("cmd_vec: {:?}", cmd_vec);
+    // println!("cmd_vec: {:?}", cmd_vec);
 
     match cmd_vec[0].to_lowercase().as_str() {
         "ping" => RespCommandType::Ping,

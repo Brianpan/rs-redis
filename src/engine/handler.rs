@@ -105,7 +105,7 @@ pub fn handle_set(
 
     resp_vec.push(RESP_OK.to_string().as_bytes().to_vec());
 
-    println!("set offset {}", offset);
+    // println!("set offset {}", offset);
 
     if db.should_sync_command() {
         Ok(CommandHandlerResponse::Replica {
@@ -189,7 +189,7 @@ pub fn handle_replica(
                         .str_data
                         .clone()
                         .parse::<u64>()?;
-                    println!("{} ack offset {}", host.clone(), offset);
+                    // println!("{} ack offset {}", host.clone(), offset);
                     db.set_slave_offset(host.clone(), offset);
                     // resp_vec.push(ret.to_string().as_bytes().to_vec());
                 }

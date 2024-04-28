@@ -176,7 +176,7 @@ impl MasterEngine for StoreEngine {
             .slave_list
             .insert(host.clone(), new_slave.clone());
 
-        println!("new slave offset: {} {}", host, new_slave.slave_repl_offset);
+        // println!("new slave offset: {} {}", host, new_slave.slave_repl_offset);
     }
 
     fn should_sync_command(&self) -> bool {
