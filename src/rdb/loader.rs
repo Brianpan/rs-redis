@@ -136,14 +136,12 @@ impl RDBLoader for StoreEngine {
                     // put k,v into  db
                     match key_type {
                         KeyType::ExpireSec(s) => {
-                            println!("set expire sec {}", s);
                             let ttl: u128 = (s * 1_000_000).into();
                             self.set_with_expire_exact(key, value, ttl);
                             cur_expire_hash_size -= 1;
                         }
                         // millisecond
                         KeyType::ExpireMs(ttl) => {
-                            println!("set expire milli {}", ttl);
                             self.set_with_expire_exact(key, value, ttl as u128);
                             cur_expire_hash_size -= 1;
                         }
