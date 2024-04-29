@@ -137,13 +137,14 @@ impl RDBLoader for StoreEngine {
                     match key_type {
                         KeyType::ExpireSec(s) => {
                             println!("set expire sec {}", s);
-                            let ttl: u128 = (s * 1_000).into();
-                            self.set_with_expire(key, value, ttl);
+                            let ttl: u128 = (s * 1_000_000).into();
+                            self.set_with_expire_exact(key, value, ttl);
                             cur_expire_hash_size -= 1;
                         }
+                        // millisecond
                         KeyType::ExpireMs(ttl) => {
-                            println!("set expire ms {}", ttl);
-                            self.set_with_expire(key, value, ttl as u128);
+                            println!("set expire milli {}", ttl);
+                            self.set_with_expire_exact(key, value, ttl as u128);
                             cur_expire_hash_size -= 1;
                         }
                         KeyType::Normal => {
@@ -243,7 +244,7 @@ impl RDBLoader for StoreEngine {
     }
 
     fn verify_expire_ms<R: Read>(&self, reader: &mut R) -> Result<KeyType> {
-        let ttl = reader.read_u64::<BigEndian>()?;
+        let ttl = reader.read_u64::<LittleEndian>()?;
         Ok(KeyType::ExpireMs(ttl))
     }
 

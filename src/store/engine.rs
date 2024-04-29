@@ -92,6 +92,11 @@ impl StoreEngine {
             .push(key, Reverse(expired_ms));
     }
 
+    pub fn set_with_expire_exact(&self, key: String, value: String, ttl: u128) {
+        self.dict.write().unwrap().insert(key.clone(), value);
+        self.expiring_queue.write().unwrap().push(key, Reverse(ttl));
+    }
+
     pub fn get_keys(&self) -> Vec<String> {
         <HashMap<String, String> as Clone>::clone(&self.dict.read().unwrap())
             .into_keys()
