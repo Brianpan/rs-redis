@@ -14,6 +14,13 @@ pub const RDB_MAGIC: &'static str = "REDIS";
 //     Err,
 // }
 
+#[derive(PartialEq)]
+pub enum KeyType {
+    Normal,
+    ExpireSec(u32),
+    ExpireMs(u64),
+}
+
 #[derive(PartialEq, Debug)]
 pub enum RDBParseType {
     None,
@@ -36,6 +43,8 @@ pub trait RDBLoader {
     fn verify_aux<R: Read>(&self, reader: &mut R) -> Result<RDBParseState>;
     fn verify_db_selector<R: Read>(&self, reader: &mut R) -> Result<RDBParseState>;
     fn verify_resize_db<R: Read>(&self, reader: &mut R) -> Result<RDBParseState>;
+    fn verify_expire_sec<R: Read>(&self, reader: &mut R) -> Result<KeyType>;
+    fn verify_expire_ms<R: Read>(&self, reader: &mut R) -> Result<KeyType>;
 
     fn parse_value_encoding<R: Read>(&self, reader: &mut R) -> Result<String>;
     fn parse_length_encoding<R: Read>(&self, reader: &mut R) -> Result<(u32, bool)>;
@@ -67,6 +76,8 @@ impl RDBLoader for StoreEngine {
         let mut cur_hash_size = 0;
         let mut cur_expire_hash_size = 0;
         let mut curdb = 0;
+        let mut key_type = KeyType::Normal;
+
         loop {
             let next_op = reader.read_u8()?;
             match next_op {
@@ -76,10 +87,20 @@ impl RDBLoader for StoreEngine {
                     // println!("aux: {:?}", aux);
                 }
                 op_code::EXPIRETIME => {
+                    if cur_expire_hash_size <= 0 {
+                        return Err(anyhow::anyhow!("wrong exipred length"));
+                    }
                     // println!("expiretime");
+                    key_type = self.verify_expire_sec(reader)?;
+                    cur_expire_hash_size -= 1;
                 }
                 op_code::EXPIRETIME_MS => {
+                    if cur_expire_hash_size <= 0 {
+                        return Err(anyhow::anyhow!("wrong exipred length"));
+                    }
                     // println!("expiretime_ms");
+                    key_type = self.verify_expire_ms(reader)?;
+                    cur_expire_hash_size -= 1;
                 }
                 op_code::RESIZEDB => {
                     let state = self.verify_resize_db(reader)?;
@@ -109,9 +130,21 @@ impl RDBLoader for StoreEngine {
                 op_code::STRING => {
                     let key = self.parse_string_encoding(reader)?;
                     let value = self.parse_string_encoding(reader)?;
-                    // println!("key: {}, {}", key, value);
                     // put k,v into  db
-                    self.set(key, value);
+                    match key_type {
+                        KeyType::ExpireSec(s) => {
+                            let ttl: u128 = (s * 1_000).into();
+                            self.set_with_expire(key, value, ttl);
+                        }
+                        KeyType::ExpireMs(ttl) => {
+                            self.set_with_expire(key, value, ttl as u128);
+                        }
+                        KeyType::Normal => {
+                            self.set(key, value);
+                        }
+                    }
+                    // assume we are usually Key without expiration
+                    key_type = KeyType::Normal;
                 }
                 1_u8..=14_u8 => {
                     // parsing type
@@ -193,6 +226,17 @@ impl RDBLoader for StoreEngine {
             parse_type: RDBParseType::ResizeDB((hashtable_size.0, expire_hashtable_size.0)),
             is_finished: true,
         })
+    }
+
+    fn verify_expire_sec<R: Read>(&self, reader: &mut R) -> Result<KeyType> {
+        let ttl = reader.read_u32::<LittleEndian>()?;
+
+        Ok(KeyType::ExpireSec(ttl))
+    }
+
+    fn verify_expire_ms<R: Read>(&self, reader: &mut R) -> Result<KeyType> {
+        let ttl = reader.read_u64::<LittleEndian>()?;
+        Ok(KeyType::ExpireMs(ttl))
     }
 
     fn parse_length_encoding<R: Read>(&self, reader: &mut R) -> Result<(u32, bool)> {
