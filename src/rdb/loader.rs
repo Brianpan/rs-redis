@@ -243,7 +243,7 @@ impl RDBLoader for StoreEngine {
     }
 
     fn verify_expire_ms<R: Read>(&self, reader: &mut R) -> Result<KeyType> {
-        let ttl = reader.read_u64::<LittleEndian>()?;
+        let ttl = reader.read_u64::<BigEndian>()?;
         Ok(KeyType::ExpireMs(ttl))
     }
 
