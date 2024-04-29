@@ -30,6 +30,7 @@ pub enum RDBParseType {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct RDBParseState {
     parse_type: RDBParseType,
     is_finished: bool,
@@ -71,11 +72,11 @@ impl RDBLoader for StoreEngine {
         }
 
         // let mut buf = [0; 1024];
-        let parse_state = RDBParseState::default();
+        let _parse_state = RDBParseState::default();
 
         let mut cur_hash_size = 0;
         let mut cur_expire_hash_size = 0;
-        let mut curdb = 0;
+        let mut _curdb = 0;
         let mut key_type = KeyType::Normal;
 
         loop {
@@ -92,7 +93,6 @@ impl RDBLoader for StoreEngine {
                     }
                     // println!("expiretime");
                     key_type = self.verify_expire_sec(reader)?;
-                    cur_expire_hash_size -= 1;
                 }
                 op_code::EXPIRETIME_MS => {
                     if cur_expire_hash_size <= 0 {
@@ -100,7 +100,6 @@ impl RDBLoader for StoreEngine {
                     }
                     // println!("expiretime_ms");
                     key_type = self.verify_expire_ms(reader)?;
-                    cur_expire_hash_size -= 1;
                 }
                 op_code::RESIZEDB => {
                     let state = self.verify_resize_db(reader)?;
@@ -117,7 +116,7 @@ impl RDBLoader for StoreEngine {
                     let state = self.verify_db_selector(reader)?;
                     match state.parse_type {
                         RDBParseType::DB(num) => {
-                            curdb = num;
+                            _curdb = num;
                         }
                         _ => {}
                     }
@@ -128,6 +127,10 @@ impl RDBLoader for StoreEngine {
                 }
                 // 0..14 are parsing key,value
                 op_code::STRING => {
+                    if cur_hash_size == 0 && cur_expire_hash_size == 0 {
+                        return Err(anyhow::anyhow!("wrong hash size"));
+                    }
+
                     let key = self.parse_string_encoding(reader)?;
                     let value = self.parse_string_encoding(reader)?;
                     // put k,v into  db
@@ -135,12 +138,15 @@ impl RDBLoader for StoreEngine {
                         KeyType::ExpireSec(s) => {
                             let ttl: u128 = (s * 1_000).into();
                             self.set_with_expire(key, value, ttl);
+                            cur_expire_hash_size -= 1;
                         }
                         KeyType::ExpireMs(ttl) => {
                             self.set_with_expire(key, value, ttl as u128);
+                            cur_expire_hash_size -= 1;
                         }
                         KeyType::Normal => {
                             self.set(key, value);
+                            cur_hash_size -= 1;
                         }
                     }
                     // assume we are usually Key without expiration
