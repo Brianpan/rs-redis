@@ -2,11 +2,12 @@ use std::sync::{Arc, RwLock};
 
 use super::{
     array_to_resp_array, count_resp_command_type_offset, string_to_bulk_string,
-    string_to_bulk_string_for_psync, CommandHandlerResponse, RespCommandType, RespMessage,
-    EMPTY_RDB, MYID, RESP_ERR, RESP_OK,
+    string_to_bulk_string_for_psync, string_to_simple_string, CommandHandlerResponse,
+    RespCommandType, RespMessage, EMPTY_RDB, MYID, RESP_ERR, RESP_OK,
 };
 
 use crate::rdb::config::RDBConfigOps;
+use crate::rdb::value_type_string;
 use crate::store::engine::StoreEngine;
 use crate::store::master_engine::MasterEngine;
 use crate::store::{HandshakeState, ReplicaType};
@@ -289,6 +290,31 @@ pub fn handle_keys(
             }
             _ => {}
         }
+        Ok(CommandHandlerResponse::Basic(resp_vec))
+    } else {
+        Err(anyhow::anyhow!("command too short"))
+    }
+}
+
+pub fn handle_type(
+    db: &Arc<StoreEngine>,
+    cmd: Arc<RwLock<RespMessage>>,
+) -> Result<CommandHandlerResponse> {
+    let mut resp_vec = Vec::new();
+
+    if cmd.read().unwrap().vec_data.len() > 1 {
+        let key = &cmd.read().unwrap().vec_data[1].str_data;
+
+        let type_str = match db.get(key.as_str()) {
+            Some(_) => value_type_string::STRING,
+            None => value_type_string::NONE,
+        };
+
+        resp_vec.push(
+            string_to_simple_string(type_str.to_string())
+                .as_bytes()
+                .to_vec(),
+        );
         Ok(CommandHandlerResponse::Basic(resp_vec))
     } else {
         Err(anyhow::anyhow!("command too short"))

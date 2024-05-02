@@ -16,6 +16,12 @@ impl Default for RdbConf {
 }
 
 #[allow(dead_code)]
+pub mod value_type_string {
+    pub const STRING: &str = "string";
+    pub const NONE: &str = "none";
+}
+
+#[allow(dead_code)]
 pub mod value_type {
     pub const STRING: u8 = 0;
     pub const LIST: u8 = 1;
