@@ -332,37 +332,34 @@ pub fn handle_xadd(
 ) -> Result<CommandHandlerResponse> {
     let mut resp_vec = Vec::new();
     let cmd_len = cmd.read().unwrap().vec_data.len();
-    if cmd_len > 4 {
-        let xadd_type = &cmd.read().unwrap().vec_data[1].str_data;
+    if cmd_len > 2 {
+        let key = &cmd.read().unwrap().vec_data[1].str_data;
+        let val = &cmd.read().unwrap().vec_data[1].str_data;
 
-        match xadd_type.to_lowercase().as_str() {
-            "stream_key" => {
-                if cmd_len % 2 != 1 {
-                    return Err(anyhow::anyhow!("key/value of stream not a pair"));
-                }
-                let key = &cmd.read().unwrap().vec_data[2].str_data;
-                let mut hmap = HashMap::new();
-
-                let mut idx = 3;
-                let mut last_key = String::new();
-                while idx < cmd_len {
-                    if idx % 2 == 0 {
-                        let val = cmd.read().unwrap().vec_data[idx].str_data.clone();
-                        hmap.insert(last_key.clone(), val);
-                    } else {
-                        last_key = cmd.read().unwrap().vec_data[idx].str_data.clone();
-                    }
-                    idx += 1;
-                }
-                // insert the map to stream
-                let resp = db.set_stream_key(key.clone(), hmap)?;
-
-                resp_vec.push(string_to_bulk_string(resp).as_bytes().to_vec());
-
-                Ok(CommandHandlerResponse::Basic(resp_vec))
-            }
-            _ => unimplemented!(),
+        let val_list: Vec<&str> = val.split(" ").collect();
+        let val_len = val_list.len();
+        if val_len == 0 || val_len % 2 != 0 {
+            return Err(anyhow::anyhow!("key/value is not a pair"));
         }
+
+        let mut hmap = HashMap::new();
+        let mut idx = 0;
+        let mut last_key = String::new();
+
+        while idx < val_len {
+            if idx % 2 == 0 {
+                last_key = val_list[idx].to_string();
+            } else {
+                hmap.insert(last_key.clone(), val_list[idx].to_string());
+            }
+            idx += 1;
+        }
+        // insert the map to stream
+        let resp = db.set_stream_key(key.clone(), hmap)?;
+
+        resp_vec.push(string_to_bulk_string(resp).as_bytes().to_vec());
+
+        Ok(CommandHandlerResponse::Basic(resp_vec))
     } else {
         Err(anyhow::anyhow!("command too short"))
     }
