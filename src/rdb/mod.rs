@@ -18,6 +18,7 @@ impl Default for RdbConf {
 #[allow(dead_code)]
 pub mod value_type_string {
     pub const STRING: &str = "string";
+    pub const STREAM: &str = "stream";
     pub const NONE: &str = "none";
 }
 

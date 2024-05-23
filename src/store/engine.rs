@@ -19,6 +19,7 @@ use tokio::sync;
 
 pub struct StoreEngine {
     dict: RwLock<HashMap<String, String>>,
+    pub stream_dict: RwLock<HashMap<String, HashMap<String, String>>>,
     expiring_queue: RwLock<PriorityQueue<String, Reverse<u128>>>,
     node_info: RwLock<NodeInfo>,
     pub rdb_info: Mutex<RdbConf>,
@@ -32,6 +33,7 @@ impl StoreEngine {
     pub fn new() -> Self {
         StoreEngine {
             dict: RwLock::new(HashMap::new()),
+            stream_dict: RwLock::new(HashMap::new()),
             rdb_info: Mutex::new(RdbConf::default()),
             expiring_queue: RwLock::new(PriorityQueue::new()),
             replica_info: RwLock::new(ReplicaType::Master),

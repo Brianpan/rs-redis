@@ -1,6 +1,7 @@
 pub mod engine;
 pub mod master_engine;
 pub mod replicator;
+pub mod stream_engine;
 
 use std::collections::HashMap;
 

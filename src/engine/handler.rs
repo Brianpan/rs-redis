@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use super::{
@@ -10,6 +11,7 @@ use crate::rdb::config::RDBConfigOps;
 use crate::rdb::value_type_string;
 use crate::store::engine::StoreEngine;
 use crate::store::master_engine::MasterEngine;
+use crate::store::stream_engine::StreamEngine;
 use crate::store::{HandshakeState, ReplicaType};
 
 use anyhow::Result;
@@ -307,7 +309,10 @@ pub fn handle_type(
 
         let type_str = match db.get(key.as_str()) {
             Some(_) => value_type_string::STRING,
-            None => value_type_string::NONE,
+            None => match db.get_stream_key(key) {
+                Some(_) => value_type_string::STREAM,
+                None => value_type_string::NONE,
+            },
         };
 
         resp_vec.push(
@@ -316,6 +321,48 @@ pub fn handle_type(
                 .to_vec(),
         );
         Ok(CommandHandlerResponse::Basic(resp_vec))
+    } else {
+        Err(anyhow::anyhow!("command too short"))
+    }
+}
+
+pub fn handle_xadd(
+    db: &Arc<StoreEngine>,
+    cmd: Arc<RwLock<RespMessage>>,
+) -> Result<CommandHandlerResponse> {
+    let mut resp_vec = Vec::new();
+    let cmd_len = cmd.read().unwrap().vec_data.len();
+    if cmd_len > 4 {
+        let xadd_type = &cmd.read().unwrap().vec_data[1].str_data;
+
+        match xadd_type.to_lowercase().as_str() {
+            "stream_key" => {
+                if cmd_len % 2 != 1 {
+                    return Err(anyhow::anyhow!("key/value of stream not a pair"));
+                }
+                let key = &cmd.read().unwrap().vec_data[2].str_data;
+                let mut hmap = HashMap::new();
+
+                let mut idx = 3;
+                let mut last_key = String::new();
+                while idx < cmd_len {
+                    if idx % 2 == 0 {
+                        let val = cmd.read().unwrap().vec_data[idx].str_data.clone();
+                        hmap.insert(last_key.clone(), val);
+                    } else {
+                        last_key = cmd.read().unwrap().vec_data[idx].str_data.clone();
+                    }
+                    idx += 1;
+                }
+                // insert the map to stream
+                let resp = db.set_stream_key(key.clone(), hmap)?;
+
+                resp_vec.push(string_to_bulk_string(resp).as_bytes().to_vec());
+
+                Ok(CommandHandlerResponse::Basic(resp_vec))
+            }
+            _ => unimplemented!(),
+        }
     } else {
         Err(anyhow::anyhow!("command too short"))
     }

@@ -192,6 +192,7 @@ pub fn string_to_bulk_string_for_psync(s: String) -> String {
 pub fn string_to_simple_string(s: String) -> String {
     format!("+{}\r\n", s)
 }
+
 pub fn array_to_resp_array(vec: Vec<String>) -> String {
     let mut ret = String::new();
     ret.push_str(format!("*{}\r\n", vec.len()).as_str());
