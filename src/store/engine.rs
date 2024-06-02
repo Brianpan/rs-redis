@@ -19,7 +19,8 @@ use tokio::sync;
 
 pub struct StoreEngine {
     dict: RwLock<HashMap<String, String>>,
-    pub stream_dict: RwLock<HashMap<String, HashMap<String, String>>>,
+    // key: stream key, value id -> HashMap<field, value>
+    pub stream_dict: RwLock<HashMap<String, HashMap<String, HashMap<String, String>>>>,
     expiring_queue: RwLock<PriorityQueue<String, Reverse<u128>>>,
     node_info: RwLock<NodeInfo>,
     pub rdb_info: Mutex<RdbConf>,

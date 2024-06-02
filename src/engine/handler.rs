@@ -332,20 +332,25 @@ pub fn handle_xadd(
 ) -> Result<CommandHandlerResponse> {
     let mut resp_vec = Vec::new();
     let cmd_len = cmd.read().unwrap().vec_data.len();
-    if cmd_len > 2 {
+    if cmd_len > 3 {
         let key = &cmd.read().unwrap().vec_data[1].str_data;
-        let val = &cmd.read().unwrap().vec_data[1].str_data;
-
-        let val_list: Vec<&str> = val.split(" ").collect();
+        let id = &cmd.read().unwrap().vec_data[2].str_data;
+        let mut val_list = Vec::new();
+        for i in 3..cmd_len {
+            let val = &cmd.read().unwrap().vec_data[i].str_data;
+            val_list.push(val.clone());
+        }
         let val_len = val_list.len();
+
         if val_len == 0 || val_len % 2 != 0 {
             return Err(anyhow::anyhow!("key/value is not a pair"));
         }
 
+        println!("debugg2 {:?}", val_list);
+
         let mut hmap = HashMap::new();
         let mut idx = 0;
         let mut last_key = String::new();
-
         while idx < val_len {
             if idx % 2 == 0 {
                 last_key = val_list[idx].to_string();
@@ -354,8 +359,9 @@ pub fn handle_xadd(
             }
             idx += 1;
         }
+
         // insert the map to stream
-        let resp = db.set_stream_key(key.clone(), hmap)?;
+        let resp = db.set_stream_key(key.clone(), id.clone(), hmap)?;
 
         resp_vec.push(string_to_bulk_string(resp).as_bytes().to_vec());
 
