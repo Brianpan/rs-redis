@@ -346,8 +346,6 @@ pub fn handle_xadd(
             return Err(anyhow::anyhow!("key/value is not a pair"));
         }
 
-        println!("debugg2 {:?}", val_list);
-
         let mut hmap = HashMap::new();
         let mut idx = 0;
         let mut last_key = String::new();
