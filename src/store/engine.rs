@@ -232,6 +232,7 @@ impl StoreEngine {
                         match command_parser(&mut buf[..buf_len]) {
                             Ok(cmds) => {
                                 // println!("cmds: {:?}", cmds);
+
                                 for cmd in cmds {
                                     match cmd.clone() {
                                         RespCommandType::Set(key, value) => {
