@@ -340,3 +340,12 @@ impl PartialOrd for StreamID {
         Some(self.millisecond.cmp(&other.millisecond))
     }
 }
+
+impl Default for StreamID {
+    fn default() -> Self {
+        StreamID {
+            millisecond: 0,
+            sequence: 0,
+        }
+    }
+}

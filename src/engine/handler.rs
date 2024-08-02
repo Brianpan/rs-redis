@@ -328,6 +328,7 @@ pub fn handle_type(
 
 static XDD_ID_ERROR: &str =
     "ERR The ID specified in XADD is equal or smaller than the target stream top item";
+static XDD_ID_ERROR_0: &str = r#"ERR The ID specified in XADD must be greater than 0-0", got "ERR The ID specified in XADD is equal or smaller than the target stream top item"#;
 
 pub fn handle_xadd(
     db: &Arc<StoreEngine>,
@@ -351,6 +352,16 @@ pub fn handle_xadd(
         }
 
         let stream_id = StreamID::from(id.as_str());
+
+        if stream_id == StreamID::default() {
+            resp_vec.push(
+                string_error_simple_string(XDD_ID_ERROR_0.to_string())
+                    .as_bytes()
+                    .to_vec(),
+            );
+
+            return Ok(CommandHandlerResponse::Basic(resp_vec));
+        }
 
         // invalid stream id
         if !db.valid_stream_id(key.clone(), stream_id.clone()) {
