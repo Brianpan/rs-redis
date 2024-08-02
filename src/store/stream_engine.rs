@@ -1,6 +1,5 @@
 use super::engine::{StoreEngine, StreamID};
 use anyhow::*;
-use std::borrow::Borrow;
 use std::collections::HashMap;
 
 pub trait StreamEngine {
@@ -57,7 +56,7 @@ impl StreamEngine for StoreEngine {
         let key = k.as_ref().to_string();
 
         if let Some(sid) = self.stream_last_key.read().unwrap().get(&key) {
-            if sid > &id {
+            if sid >= &id {
                 return false;
             }
         }
