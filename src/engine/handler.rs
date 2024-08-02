@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use super::{
-    array_to_resp_array, count_resp_command_type_offset, string_to_bulk_string,
-    string_to_bulk_string_for_psync, string_to_simple_string, CommandHandlerResponse,
-    RespCommandType, RespMessage, EMPTY_RDB, MYID, RESP_ERR, RESP_OK,
+    array_to_resp_array, count_resp_command_type_offset, string_error_simple_string,
+    string_to_bulk_string, string_to_bulk_string_for_psync, string_to_simple_string,
+    CommandHandlerResponse, RespCommandType, RespMessage, EMPTY_RDB, MYID, RESP_ERR, RESP_OK,
 };
 
 use crate::rdb::config::RDBConfigOps;
 use crate::rdb::value_type_string;
-use crate::store::engine::StoreEngine;
+use crate::store::engine::{StoreEngine, StreamID};
 use crate::store::master_engine::MasterEngine;
 use crate::store::stream_engine::StreamEngine;
 use crate::store::{HandshakeState, ReplicaType};
@@ -326,6 +326,9 @@ pub fn handle_type(
     }
 }
 
+static XDD_ID_ERROR: &str =
+    "ERR The ID specified in XADD is equal or smaller than the target stream top item";
+
 pub fn handle_xadd(
     db: &Arc<StoreEngine>,
     cmd: Arc<RwLock<RespMessage>>,
@@ -335,6 +338,31 @@ pub fn handle_xadd(
     if cmd_len > 3 {
         let key = &cmd.read().unwrap().vec_data[1].str_data;
         let id = &cmd.read().unwrap().vec_data[2].str_data;
+
+        // check stream id is valid
+        if !StreamID::validate(id) {
+            resp_vec.push(
+                string_error_simple_string(XDD_ID_ERROR.to_string())
+                    .as_bytes()
+                    .to_vec(),
+            );
+
+            return Ok(CommandHandlerResponse::Basic(resp_vec));
+        }
+
+        let stream_id = StreamID::from(id.as_str());
+
+        // invalid stream id
+        if !db.valid_stream_id(key.clone(), stream_id.clone()) {
+            resp_vec.push(
+                string_error_simple_string(XDD_ID_ERROR.to_string())
+                    .as_bytes()
+                    .to_vec(),
+            );
+
+            return Ok(CommandHandlerResponse::Basic(resp_vec));
+        }
+
         let mut val_list = Vec::new();
         for i in 3..cmd_len {
             let val = &cmd.read().unwrap().vec_data[i].str_data;
@@ -359,7 +387,7 @@ pub fn handle_xadd(
         }
 
         // insert the map to stream
-        let resp = db.set_stream_key(key.clone(), id.clone(), hmap)?;
+        let resp = db.set_stream_key(key.clone(), stream_id, hmap)?;
 
         resp_vec.push(string_to_bulk_string(resp).as_bytes().to_vec());
 

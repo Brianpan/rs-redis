@@ -20,7 +20,8 @@ use tokio::sync;
 pub struct StoreEngine {
     dict: RwLock<HashMap<String, String>>,
     // key: stream key, value id -> HashMap<field, value>
-    pub stream_dict: RwLock<HashMap<String, HashMap<String, HashMap<String, String>>>>,
+    pub stream_dict: RwLock<HashMap<String, HashMap<StreamID, HashMap<String, String>>>>,
+    pub stream_last_key: RwLock<HashMap<String, StreamID>>,
     expiring_queue: RwLock<PriorityQueue<String, Reverse<u128>>>,
     node_info: RwLock<NodeInfo>,
     pub rdb_info: Mutex<RdbConf>,
@@ -35,6 +36,7 @@ impl StoreEngine {
         StoreEngine {
             dict: RwLock::new(HashMap::new()),
             stream_dict: RwLock::new(HashMap::new()),
+            stream_last_key: RwLock::new(HashMap::new()),
             rdb_info: Mutex::new(RdbConf::default()),
             expiring_queue: RwLock::new(PriorityQueue::new()),
             replica_info: RwLock::new(ReplicaType::Master),
@@ -285,5 +287,56 @@ impl StoreEngine {
 impl Default for StoreEngine {
     fn default() -> Self {
         StoreEngine::new()
+    }
+}
+
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub struct StreamID {
+    pub millisecond: u128,
+    pub sequence: u64,
+}
+
+impl From<&str> for StreamID {
+    fn from(s: &str) -> Self {
+        let v: Vec<&str> = s.split("-").collect();
+        StreamID {
+            millisecond: v[0].parse::<u128>().unwrap(),
+            sequence: v[1].parse::<u64>().unwrap(),
+        }
+    }
+}
+
+impl From<&StreamID> for String {
+    fn from(s: &StreamID) -> Self {
+        format!("{}-{}", s.millisecond, s.sequence)
+    }
+}
+
+impl StreamID {
+    pub fn validate(s: &str) -> bool {
+        let v = s.split("-").collect::<Vec<&str>>();
+        if v.len() != 2 {
+            return false;
+        }
+
+        if v[0].parse::<u128>().is_err() {
+            return false;
+        }
+
+        if v[1].parse::<u64>().is_err() {
+            return false;
+        }
+
+        true
+    }
+}
+
+impl PartialOrd for StreamID {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if self.millisecond == other.millisecond {
+            return Some(self.sequence.cmp(&other.sequence));
+        }
+
+        Some(self.millisecond.cmp(&other.millisecond))
     }
 }
