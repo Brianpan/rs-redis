@@ -328,7 +328,7 @@ pub fn handle_type(
 
 static XDD_ID_ERROR: &str =
     "ERR The ID specified in XADD is equal or smaller than the target stream top item";
-static XDD_ID_ERROR_0: &str = r#"ERR The ID specified in XADD must be greater than 0-0", got "ERR The ID specified in XADD is equal or smaller than the target stream top item"#;
+static XDD_ID_ERROR_0: &str = "ERR The ID specified in XADD must be greater than 0-0\", got \"ERR The ID specified in XADD is equal or smaller than the target stream top item";
 
 pub fn handle_xadd(
     db: &Arc<StoreEngine>,
