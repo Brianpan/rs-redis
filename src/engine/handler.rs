@@ -9,7 +9,7 @@ use super::{
 
 use crate::rdb::config::RDBConfigOps;
 use crate::rdb::value_type_string;
-use crate::store::engine::{StoreEngine, StreamID};
+use crate::store::engine::{StoreEngine, StreamID, StreamIDState};
 use crate::store::master_engine::MasterEngine;
 use crate::store::stream_engine::StreamEngine;
 use crate::store::{HandshakeState, ReplicaType};
@@ -340,19 +340,42 @@ pub fn handle_xadd(
         let key = &cmd.read().unwrap().vec_data[1].str_data;
         let id = &cmd.read().unwrap().vec_data[2].str_data;
 
-        // check stream id is valid
-        if !StreamID::validate(id) {
-            resp_vec.push(
-                string_error_simple_string(XDD_ID_ERROR.to_string())
-                    .as_bytes()
-                    .to_vec(),
-            );
+        #[warn(unused_assignments)]
+        let stream_id;
 
-            return Ok(CommandHandlerResponse::Basic(resp_vec));
+        match StreamID::validate(id) {
+            StreamIDState::Err => {
+                resp_vec.push(
+                    string_error_simple_string(XDD_ID_ERROR.to_string())
+                        .as_bytes()
+                        .to_vec(),
+                );
+                return Ok(CommandHandlerResponse::Basic(resp_vec));
+            }
+            StreamIDState::GenerateSequence(ts) => {
+                match db.next_stream_sequence_id(key.clone(), ts) {
+                    Some(sid) => {
+                        stream_id = sid;
+                    }
+                    None => {
+                        resp_vec.push(
+                            string_error_simple_string(XDD_ID_ERROR.to_string())
+                                .as_bytes()
+                                .to_vec(),
+                        );
+                        return Ok(CommandHandlerResponse::Basic(resp_vec));
+                    }
+                }
+            }
+            StreamIDState::GenerateMillisecond => {
+                unimplemented!()
+            }
+            StreamIDState::Ok => {
+                stream_id = StreamID::from(id.as_str());
+            }
         }
 
-        let stream_id = StreamID::from(id.as_str());
-
+        // post validation
         if stream_id == StreamID::default() {
             resp_vec.push(
                 string_error_simple_string(XDD_ID_ERROR_0.to_string())

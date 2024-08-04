@@ -16,6 +16,8 @@ pub trait StreamEngine {
     ) -> Option<HashMap<StreamID, HashMap<String, String>>>;
 
     fn valid_stream_id(&self, k: impl AsRef<str>, id: StreamID) -> bool;
+
+    fn next_stream_sequence_id(&self, k: impl AsRef<str>, ts: u128) -> Option<StreamID>;
 }
 
 impl StreamEngine for StoreEngine {
@@ -62,5 +64,27 @@ impl StreamEngine for StoreEngine {
         }
 
         true
+    }
+
+    fn next_stream_sequence_id(&self, k: impl AsRef<str>, ts: u128) -> Option<StreamID> {
+        let key = k.as_ref().to_string();
+
+        if let Some(sid) = self.stream_last_key.read().unwrap().get(&key) {
+            // not valid
+            if sid.millisecond > ts {
+                None
+            } else if sid.millisecond < ts {
+                Some(StreamID::new(ts, 0))
+            } else {
+                Some(sid.next_sequence_id())
+            }
+        } else {
+            // edge case ts == 0
+            if ts == 0 {
+                Some(StreamID::new(ts, 1))
+            } else {
+                Some(StreamID::new(ts, 0))
+            }
+        }
     }
 }

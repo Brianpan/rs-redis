@@ -299,6 +299,7 @@ pub struct StreamID {
 impl From<&str> for StreamID {
     fn from(s: &str) -> Self {
         let v: Vec<&str> = s.split("-").collect();
+
         StreamID {
             millisecond: v[0].parse::<u128>().unwrap(),
             sequence: v[1].parse::<u64>().unwrap(),
@@ -312,22 +313,50 @@ impl From<&StreamID> for String {
     }
 }
 
+pub enum StreamIDState {
+    Ok,
+    GenerateSequence(u128), // store timestamp
+    GenerateMillisecond,
+    Err,
+}
+
 impl StreamID {
-    pub fn validate(s: &str) -> bool {
+    pub fn new(ts: u128, seq: u64) -> Self {
+        StreamID {
+            millisecond: ts,
+            sequence: seq,
+        }
+    }
+
+    pub fn validate(s: &str) -> StreamIDState {
         let v = s.split("-").collect::<Vec<&str>>();
         if v.len() != 2 {
-            return false;
+            return StreamIDState::Err;
         }
 
         if v[0].parse::<u128>().is_err() {
-            return false;
+            if v[0] == "*" {
+                return StreamIDState::GenerateMillisecond;
+            }
+            return StreamIDState::Err;
         }
 
         if v[1].parse::<u64>().is_err() {
-            return false;
+            if v[1] == "*" {
+                let ts = v[0].parse::<u128>().unwrap();
+                return StreamIDState::GenerateSequence(ts);
+            }
+            return StreamIDState::Err;
         }
 
-        true
+        StreamIDState::Ok
+    }
+
+    pub fn next_sequence_id(&self) -> StreamID {
+        StreamID {
+            millisecond: self.millisecond,
+            sequence: self.sequence + 1,
+        }
     }
 }
 
