@@ -368,7 +368,7 @@ pub fn handle_xadd(
                 }
             }
             StreamIDState::GenerateMillisecond => {
-                unimplemented!()
+                stream_id = StreamID::new_current_ts();
             }
             StreamIDState::Ok => {
                 stream_id = StreamID::from(id.as_str());

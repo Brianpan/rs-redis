@@ -328,9 +328,24 @@ impl StreamID {
         }
     }
 
+    pub fn new_current_ts() -> StreamID {
+        let ts = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
+
+        StreamID {
+            millisecond: ts.as_millis(),
+            sequence: 0,
+        }
+    }
+
     pub fn validate(s: &str) -> StreamIDState {
         let v = s.split("-").collect::<Vec<&str>>();
         if v.len() != 2 {
+            if v[0] == "*" {
+                return StreamIDState::GenerateMillisecond;
+            }
+
             return StreamIDState::Err;
         }
 
