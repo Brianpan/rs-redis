@@ -109,7 +109,6 @@ impl StreamEngine for StoreEngine {
         end: &StreamID,
     ) -> Vec<StreamRange> {
         let mut vec = Vec::new();
-
         let key = k.as_ref().to_string();
 
         if let Some(id_map) = self.stream_dict.read().unwrap().get(&key) {

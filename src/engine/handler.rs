@@ -455,8 +455,9 @@ pub fn handle_xrange(
             StreamIDState::MillisecondOnly(ts) => StreamID::new(ts, 0),
             _ => StreamID::default(),
         };
+
         let to_stream_key = match StreamID::validate(&to) {
-            StreamIDState::Ok => StreamID::from(from.clone().as_str()),
+            StreamIDState::Ok => StreamID::from(to.clone().as_str()),
             StreamIDState::MillisecondOnly(ts) => StreamID::new(ts, 0),
             _ => StreamID::default(),
         };
