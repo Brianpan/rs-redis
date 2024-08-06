@@ -5,6 +5,8 @@ pub mod parser;
 
 use hex;
 
+use crate::store::stream_engine::StreamRange;
+
 // const CRLR: &str = "\r\n";
 
 const RESP_OK: &str = "+OK\r\n";
@@ -206,6 +208,27 @@ pub fn array_to_resp_array(vec: Vec<String>) -> String {
     }
 
     return ret;
+}
+
+pub fn array_to_resp_array_for_xrange(v: &Vec<StreamRange>) -> String {
+    let mut ret = String::new();
+    ret.push_str(format!("*{}\r\n", v.len()).as_str());
+
+    for r in v {
+        // hardcoded for StreamID, hash array
+        ret.push_str(format!("*2\r\n").as_str());
+        ret.push_str(&string_to_bulk_string((&r.stream_id).into()));
+
+        let hash_total_len = r.hash.len() * 2;
+        ret.push_str(format!("*{}\r\n", hash_total_len).as_str());
+
+        for (k, v) in r.hash.iter() {
+            ret.push_str(&string_to_bulk_string(k.clone()));
+            ret.push_str(&string_to_bulk_string(v.clone()));
+        }
+    }
+
+    ret
 }
 
 pub fn count_resp_command_type_offset(resp_command_type: RespCommandType) -> usize {

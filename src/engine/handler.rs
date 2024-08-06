@@ -2,9 +2,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use super::{
-    array_to_resp_array, count_resp_command_type_offset, string_error_simple_string,
-    string_to_bulk_string, string_to_bulk_string_for_psync, string_to_simple_string,
-    CommandHandlerResponse, RespCommandType, RespMessage, EMPTY_RDB, MYID, RESP_ERR, RESP_OK,
+    array_to_resp_array, array_to_resp_array_for_xrange, count_resp_command_type_offset,
+    string_error_simple_string, string_to_bulk_string, string_to_bulk_string_for_psync,
+    string_to_simple_string, CommandHandlerResponse, RespCommandType, RespMessage, EMPTY_RDB, MYID,
+    RESP_ERR, RESP_OK,
 };
 
 use crate::rdb::config::RDBConfigOps;
@@ -352,6 +353,14 @@ pub fn handle_xadd(
                 );
                 return Ok(CommandHandlerResponse::Basic(resp_vec));
             }
+            StreamIDState::MillisecondOnly(_ts) => {
+                resp_vec.push(
+                    string_error_simple_string(XDD_ID_ERROR.to_string())
+                        .as_bytes()
+                        .to_vec(),
+                );
+                return Ok(CommandHandlerResponse::Basic(resp_vec));
+            }
             StreamIDState::GenerateSequence(ts) => {
                 match db.next_stream_sequence_id(key.clone(), ts) {
                     Some(sid) => {
@@ -424,6 +433,46 @@ pub fn handle_xadd(
         let resp = db.set_stream_key(key.clone(), stream_id, hmap)?;
 
         resp_vec.push(string_to_bulk_string(resp).as_bytes().to_vec());
+
+        Ok(CommandHandlerResponse::Basic(resp_vec))
+    } else {
+        Err(anyhow::anyhow!("command too short"))
+    }
+}
+
+pub fn handle_xrange(
+    db: &Arc<StoreEngine>,
+    cmd: Arc<RwLock<RespMessage>>,
+) -> Result<CommandHandlerResponse> {
+    let mut resp_vec = Vec::new();
+    let cmd_len = cmd.read().unwrap().vec_data.len();
+    if cmd_len > 3 {
+        let k = &cmd.read().unwrap().vec_data[1].str_data;
+        let from = &cmd.read().unwrap().vec_data[2].str_data;
+        let to = &cmd.read().unwrap().vec_data[3].str_data;
+        let from_stream_key = match StreamID::validate(&from) {
+            StreamIDState::Ok => StreamID::from(from.clone().as_str()),
+            StreamIDState::MillisecondOnly(ts) => StreamID::new(ts, 0),
+            _ => StreamID::default(),
+        };
+        let to_stream_key = match StreamID::validate(&to) {
+            StreamIDState::Ok => StreamID::from(from.clone().as_str()),
+            StreamIDState::MillisecondOnly(ts) => StreamID::new(ts, 0),
+            _ => StreamID::default(),
+        };
+
+        // error check
+        if from_stream_key == StreamID::default() || to_stream_key == StreamID::default() {
+            return Err(anyhow::anyhow!("invalid stream id"));
+        }
+        let stream_range = db.get_stream_by_range(k.clone(), &from_stream_key, &to_stream_key);
+        // println!("{:?}", array_to_resp_array_for_xrange(&stream_range));
+
+        resp_vec.push(
+            array_to_resp_array_for_xrange(&stream_range)
+                .as_bytes()
+                .to_vec(),
+        );
 
         Ok(CommandHandlerResponse::Basic(resp_vec))
     } else {

@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock};
 
 use super::handler::{
     handle_config, handle_info, handle_keys, handle_psync, handle_replica, handle_set, handle_type,
-    handle_wait, handle_xadd,
+    handle_wait, handle_xadd, handle_xrange,
 };
 use super::{
     CommandHandlerResponse, RespMessage, RespType, RESP_EMPTY, RESP_ERR, RESP_OK, RESP_PONG,
@@ -25,6 +25,7 @@ const COMMAND_CONFIG: &str = "config";
 const COMMAND_KEYS: &str = "keys";
 const COMMAND_TYPE: &str = "type";
 const COMMAND_XADD: &str = "xadd";
+const COMMAND_XRANGE: &str = "xrange";
 
 // we support multiple responses to handle commands like psync
 pub fn command_handler(
@@ -115,6 +116,7 @@ pub fn command_handler(
                         COMMAND_KEYS => handle_keys(&db.clone(), cmd.clone()),
                         COMMAND_TYPE => handle_type(&db.clone(), cmd.clone()),
                         COMMAND_XADD => handle_xadd(&db.clone(), cmd.clone()),
+                        COMMAND_XRANGE => handle_xrange(&db.clone(), cmd.clone()),
                         _ => {
                             resp_vec.push(RESP_EMPTY.to_string().as_bytes().to_vec());
                             Ok(CommandHandlerResponse::Basic(resp_vec))

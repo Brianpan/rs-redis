@@ -1,6 +1,13 @@
 use super::engine::{StoreEngine, StreamID};
 use anyhow::*;
-use std::collections::HashMap;
+use core::ops::Bound::Included;
+use std::collections::{BTreeMap, HashMap};
+
+#[derive(Debug)]
+pub struct StreamRange {
+    pub stream_id: StreamID,
+    pub hash: HashMap<String, String>,
+}
 
 pub trait StreamEngine {
     fn set_stream_key(
@@ -13,11 +20,18 @@ pub trait StreamEngine {
     fn get_stream_key(
         &self,
         k: impl AsRef<str>,
-    ) -> Option<HashMap<StreamID, HashMap<String, String>>>;
+    ) -> Option<BTreeMap<StreamID, HashMap<String, String>>>;
 
     fn valid_stream_id(&self, k: impl AsRef<str>, id: StreamID) -> bool;
 
     fn next_stream_sequence_id(&self, k: impl AsRef<str>, ts: u128) -> Option<StreamID>;
+
+    fn get_stream_by_range(
+        &self,
+        k: impl AsRef<str>,
+        start: &StreamID,
+        end: &StreamID,
+    ) -> Vec<StreamRange>;
 }
 
 impl StreamEngine for StoreEngine {
@@ -28,7 +42,7 @@ impl StreamEngine for StoreEngine {
         hash: HashMap<String, String>,
     ) -> Result<String> {
         let key = k.as_ref().to_string();
-        let mut hmap = HashMap::new();
+        let mut hmap = BTreeMap::new();
         if let Some(id_map) = self.stream_dict.read().unwrap().get(&key) {
             hmap = id_map.clone();
         }
@@ -49,7 +63,7 @@ impl StreamEngine for StoreEngine {
     fn get_stream_key(
         &self,
         k: impl AsRef<str>,
-    ) -> Option<HashMap<StreamID, HashMap<String, String>>> {
+    ) -> Option<BTreeMap<StreamID, HashMap<String, String>>> {
         let d = self.stream_dict.read().unwrap();
         d.get(k.as_ref()).clone().cloned()
     }
@@ -86,5 +100,29 @@ impl StreamEngine for StoreEngine {
                 Some(StreamID::new(ts, 0))
             }
         }
+    }
+
+    fn get_stream_by_range(
+        &self,
+        k: impl AsRef<str>,
+        start: &StreamID,
+        end: &StreamID,
+    ) -> Vec<StreamRange> {
+        let mut vec = Vec::new();
+
+        let key = k.as_ref().to_string();
+
+        if let Some(id_map) = self.stream_dict.read().unwrap().get(&key) {
+            id_map
+                .range((Included(start), Included(end)))
+                .for_each(|(id, hash)| {
+                    vec.push(StreamRange {
+                        stream_id: id.clone(),
+                        hash: hash.clone(),
+                    })
+                });
+        }
+
+        vec
     }
 }

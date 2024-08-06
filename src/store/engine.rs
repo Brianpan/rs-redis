@@ -3,7 +3,7 @@ use crate::engine::parser::command_parser;
 use crate::engine::{array_to_resp_array, count_resp_command_type_offset, RespCommandType};
 use priority_queue::PriorityQueue;
 use std::cmp::Reverse;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use tokio::net::tcp::OwnedWriteHalf;
 // use std::io::prelude::*;
 use crate::rdb::RdbConf;
@@ -20,7 +20,7 @@ use tokio::sync;
 pub struct StoreEngine {
     dict: RwLock<HashMap<String, String>>,
     // key: stream key, value id -> HashMap<field, value>
-    pub stream_dict: RwLock<HashMap<String, HashMap<StreamID, HashMap<String, String>>>>,
+    pub stream_dict: RwLock<HashMap<String, BTreeMap<StreamID, HashMap<String, String>>>>,
     pub stream_last_key: RwLock<HashMap<String, StreamID>>,
     expiring_queue: RwLock<PriorityQueue<String, Reverse<u128>>>,
     node_info: RwLock<NodeInfo>,
@@ -290,7 +290,7 @@ impl Default for StoreEngine {
     }
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq, Ord, Debug)]
 pub struct StreamID {
     pub millisecond: u128,
     pub sequence: u64,
@@ -315,6 +315,7 @@ impl From<&StreamID> for String {
 
 pub enum StreamIDState {
     Ok,
+    MillisecondOnly(u128),
     GenerateSequence(u128), // store timestamp
     GenerateMillisecond,
     Err,
@@ -344,6 +345,10 @@ impl StreamID {
         if v.len() != 2 {
             if v[0] == "*" {
                 return StreamIDState::GenerateMillisecond;
+            }
+
+            if let Ok(ts) = v[0].parse::<u128>() {
+                return StreamIDState::MillisecondOnly(ts);
             }
 
             return StreamIDState::Err;
