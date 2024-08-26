@@ -454,19 +454,17 @@ pub fn handle_xrange(
             StreamIDState::Ok => StreamID::from(from.clone().as_str()),
             StreamIDState::MillisecondOnly(ts) => StreamID::new(ts, 0),
             StreamIDState::FirstStreamID(sid) => sid,
-            _ => StreamID::default(),
+            _ => return Err(anyhow::anyhow!("invalid stream id")),
         };
 
         let to_stream_key = match StreamID::validate(&to) {
             StreamIDState::Ok => StreamID::from(to.clone().as_str()),
             StreamIDState::MillisecondOnly(ts) => StreamID::new(ts, 0),
-            _ => StreamID::default(),
+            _ => return Err(anyhow::anyhow!("invalid stream id")),
         };
 
-        // error check
-        if from_stream_key == StreamID::default() || to_stream_key == StreamID::default() {
-            return Err(anyhow::anyhow!("invalid stream id"));
-        }
+        // println!("from {:?} to {:?}", from_stream_key, to_stream_key);
+
         let stream_range = db.get_stream_by_range(k.clone(), &from_stream_key, &to_stream_key);
         // println!("{:?}", array_to_resp_array_for_xrange(&stream_range));
 
