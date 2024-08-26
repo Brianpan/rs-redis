@@ -318,6 +318,7 @@ pub enum StreamIDState {
     MillisecondOnly(u128),
     GenerateSequence(u128), // store timestamp
     GenerateMillisecond,
+    FirstStreamID(StreamID),
     Err,
 }
 
@@ -341,6 +342,11 @@ impl StreamID {
     }
 
     pub fn validate(s: &str) -> StreamIDState {
+        // beginning of stream
+        if s == "-" {
+            return StreamIDState::FirstStreamID(StreamID::default());
+        }
+
         let v = s.split("-").collect::<Vec<&str>>();
         if v.len() != 2 {
             if v[0] == "*" {
