@@ -319,6 +319,7 @@ pub enum StreamIDState {
     GenerateSequence(u128), // store timestamp
     GenerateMillisecond,
     FirstStreamID(StreamID),
+    LastStreamID,
     Err,
 }
 
@@ -345,6 +346,8 @@ impl StreamID {
         // beginning of stream
         if s == "-" {
             return StreamIDState::FirstStreamID(StreamID::default());
+        } else if s == "+" {
+            return StreamIDState::LastStreamID;
         }
 
         let v = s.split("-").collect::<Vec<&str>>();

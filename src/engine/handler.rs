@@ -345,7 +345,7 @@ pub fn handle_xadd(
         let stream_id;
 
         match StreamID::validate(id) {
-            StreamIDState::FirstStreamID(_) | StreamIDState::Err => {
+            StreamIDState::FirstStreamID(_) | StreamIDState::LastStreamID | StreamIDState::Err => {
                 resp_vec.push(
                     string_error_simple_string(XDD_ID_ERROR.to_string())
                         .as_bytes()
@@ -460,6 +460,10 @@ pub fn handle_xrange(
         let to_stream_key = match StreamID::validate(&to) {
             StreamIDState::Ok => StreamID::from(to.clone().as_str()),
             StreamIDState::MillisecondOnly(ts) => StreamID::new(ts, 0),
+            StreamIDState::LastStreamID => match db.get_last_stream_id(k.clone()) {
+                Some(sid) => sid,
+                None => StreamID::default(),
+            },
             _ => return Err(anyhow::anyhow!("invalid stream id")),
         };
 

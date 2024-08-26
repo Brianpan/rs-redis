@@ -24,6 +24,8 @@ pub trait StreamEngine {
 
     fn valid_stream_id(&self, k: impl AsRef<str>, id: StreamID) -> bool;
 
+    fn get_last_stream_id(&self, k: impl AsRef<str>) -> Option<StreamID>;
+
     fn next_stream_sequence_id(&self, k: impl AsRef<str>, ts: u128) -> Option<StreamID>;
 
     fn get_stream_by_range(
@@ -71,8 +73,8 @@ impl StreamEngine for StoreEngine {
     fn valid_stream_id(&self, k: impl AsRef<str>, id: StreamID) -> bool {
         let key = k.as_ref().to_string();
 
-        if let Some(sid) = self.stream_last_key.read().unwrap().get(&key) {
-            if sid >= &id {
+        if let Some(sid) = self.get_last_stream_id(key) {
+            if sid >= id {
                 return false;
             }
         }
@@ -80,10 +82,15 @@ impl StreamEngine for StoreEngine {
         true
     }
 
+    fn get_last_stream_id(&self, k: impl AsRef<str>) -> Option<StreamID> {
+        let key = k.as_ref().to_string();
+        self.stream_last_key.read().unwrap().get(&key).cloned()
+    }
+
     fn next_stream_sequence_id(&self, k: impl AsRef<str>, ts: u128) -> Option<StreamID> {
         let key = k.as_ref().to_string();
 
-        if let Some(sid) = self.stream_last_key.read().unwrap().get(&key) {
+        if let Some(sid) = self.get_last_stream_id(key) {
             // not valid
             if sid.millisecond > ts {
                 None
