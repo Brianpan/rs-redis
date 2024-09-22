@@ -209,7 +209,16 @@ pub fn array_to_resp_array(vec: Vec<String>) -> String {
 
     ret
 }
+pub fn array_to_simple_resp_array(vec: Vec<String>) -> String {
+    let mut ret = String::new();
+    ret.push_str(format!("*{}\r\n", vec.len()).as_str());
 
+    for v in vec {
+        ret.push_str(&v);
+    }
+
+    ret
+}
 pub fn array_to_resp_array_for_xrange(v: &Vec<StreamRange>) -> String {
     let mut ret = String::new();
     ret.push_str(format!("*{}\r\n", v.len()).as_str());

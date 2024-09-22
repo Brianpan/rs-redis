@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use super::{
-    array_to_resp_array, array_to_resp_array_for_xrange, count_resp_command_type_offset,
-    string_error_simple_string, string_to_bulk_string, string_to_bulk_string_for_psync,
-    string_to_simple_string, xrange_to_read_wrap, CommandHandlerResponse, RespCommandType,
-    RespMessage, EMPTY_RDB, MYID, RESP_ERR, RESP_OK,
+    array_to_resp_array, array_to_resp_array_for_xrange, array_to_simple_resp_array,
+    count_resp_command_type_offset, string_error_simple_string, string_to_bulk_string,
+    string_to_bulk_string_for_psync, string_to_simple_string, xrange_to_read_wrap,
+    CommandHandlerResponse, RespCommandType, RespMessage, EMPTY_RDB, MYID, RESP_ERR, RESP_OK,
 };
 
 use crate::rdb::config::RDBConfigOps;
@@ -509,7 +509,7 @@ pub(crate) fn handle_xread(
         array_to_resp_array_for_xrange(&stream_range).as_str(),
     );
     let xadd_arr = vec![key_stream_wrap];
-    resp_vec.push(array_to_resp_array(xadd_arr).as_bytes().to_vec());
+    resp_vec.push(array_to_simple_resp_array(xadd_arr).as_bytes().to_vec());
 
     Ok(CommandHandlerResponse::Basic(resp_vec))
 }
