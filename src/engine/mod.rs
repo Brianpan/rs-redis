@@ -207,7 +207,7 @@ pub fn array_to_resp_array(vec: Vec<String>) -> String {
         ret.push_str(&string_to_bulk_string(v));
     }
 
-    return ret;
+    ret
 }
 
 pub fn array_to_resp_array_for_xrange(v: &Vec<StreamRange>) -> String {
@@ -216,7 +216,7 @@ pub fn array_to_resp_array_for_xrange(v: &Vec<StreamRange>) -> String {
 
     for r in v {
         // hardcoded for StreamID, hash array
-        ret.push_str(format!("*2\r\n").as_str());
+        ret.push_str("*2\r\n");
         ret.push_str(&string_to_bulk_string((&r.stream_id).into()));
 
         let hash_total_len = r.hash.len() * 2;
@@ -231,6 +231,14 @@ pub fn array_to_resp_array_for_xrange(v: &Vec<StreamRange>) -> String {
     ret
 }
 
+pub(crate) fn xrange_to_read_wrap(k: &str, v: &str) -> String {
+    let mut ret = String::new();
+    ret.push_str("*2\r\n");
+    ret.push_str(&string_to_bulk_string(k.to_string()));
+    ret.push_str(v);
+
+    ret
+}
 pub fn count_resp_command_type_offset(resp_command_type: RespCommandType) -> usize {
     match resp_command_type {
         RespCommandType::Error => 0,

@@ -4,8 +4,8 @@ use std::sync::{Arc, RwLock};
 use super::{
     array_to_resp_array, array_to_resp_array_for_xrange, count_resp_command_type_offset,
     string_error_simple_string, string_to_bulk_string, string_to_bulk_string_for_psync,
-    string_to_simple_string, CommandHandlerResponse, RespCommandType, RespMessage, EMPTY_RDB, MYID,
-    RESP_ERR, RESP_OK,
+    string_to_simple_string, xrange_to_read_wrap, CommandHandlerResponse, RespCommandType,
+    RespMessage, EMPTY_RDB, MYID, RESP_ERR, RESP_OK,
 };
 
 use crate::rdb::config::RDBConfigOps;
@@ -488,6 +488,28 @@ pub(crate) fn handle_xread(
     if cmd_len < 4 {
         return Err(anyhow::anyhow!("command too short"));
     }
+
+    // 1 is streams
+    let k = &cmd.read().unwrap().vec_data[2].str_data;
+    let from = &cmd.read().unwrap().vec_data[3].str_data;
+
+    let from_stream_key = match StreamID::validate(from) {
+        StreamIDState::Ok => StreamID::from(from.clone().as_str()),
+        StreamIDState::MillisecondOnly(ts) => StreamID::new(ts, 0),
+        StreamIDState::FirstStreamID(sid) => sid,
+        _ => return Err(anyhow::anyhow!("invalid stream id")),
+    };
+
+    // we need to pack one more layer of array for xread
+
+    let to_stream_key = db.get_last_stream_id(k.clone()).unwrap_or_default();
+    let stream_range = db.get_stream_by_range(k.clone(), &from_stream_key, &to_stream_key);
+    let key_stream_wrap = xrange_to_read_wrap(
+        k.as_str(),
+        array_to_resp_array_for_xrange(&stream_range).as_str(),
+    );
+    let xadd_arr = vec![key_stream_wrap];
+    resp_vec.push(array_to_resp_array(xadd_arr).as_bytes().to_vec());
 
     Ok(CommandHandlerResponse::Basic(resp_vec))
 }
