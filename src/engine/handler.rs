@@ -23,7 +23,7 @@ pub fn handle_info(
 ) -> Result<CommandHandlerResponse> {
     let mut lookup_keys: Vec<String> = Vec::new();
     for i in 1..cmd.read().unwrap().vec_data.len() {
-        lookup_keys.push(cmd.read().unwrap().vec_data[i as usize].str_data.clone());
+        lookup_keys.push(cmd.read().unwrap().vec_data[i].str_data.clone());
     }
 
     let mut resp_vec = Vec::new();
@@ -147,7 +147,7 @@ pub fn handle_psync(
     resp_vec.push(rdb_vec);
     Ok(CommandHandlerResponse::Psync {
         message: resp_vec,
-        host: host,
+        host,
     })
 }
 
@@ -283,15 +283,13 @@ pub fn handle_keys(
     let mut resp_vec = Vec::new();
 
     if cmd.read().unwrap().vec_data.len() > 1 {
-        match cmd.read().unwrap().vec_data[1]
+        if cmd.read().unwrap().vec_data[1]
             .str_data
             .to_lowercase()
             .as_str()
+            == "*"
         {
-            "*" => {
-                resp_vec.push(array_to_resp_array(db.get_keys()).as_bytes().to_vec());
-            }
-            _ => {}
+            resp_vec.push(array_to_resp_array(db.get_keys()).as_bytes().to_vec());
         }
         Ok(CommandHandlerResponse::Basic(resp_vec))
     } else {
@@ -299,7 +297,7 @@ pub fn handle_keys(
     }
 }
 
-pub fn handle_type(
+pub(crate) fn handle_type(
     db: &Arc<StoreEngine>,
     cmd: Arc<RwLock<RespMessage>>,
 ) -> Result<CommandHandlerResponse> {
@@ -331,7 +329,7 @@ static XDD_ID_ERROR: &str =
     "ERR The ID specified in XADD is equal or smaller than the target stream top item";
 static XDD_ID_ERROR_0: &str = "ERR The ID specified in XADD must be greater than 0-0";
 
-pub fn handle_xadd(
+pub(crate) fn handle_xadd(
     db: &Arc<StoreEngine>,
     cmd: Arc<RwLock<RespMessage>>,
 ) -> Result<CommandHandlerResponse> {
@@ -440,46 +438,56 @@ pub fn handle_xadd(
     }
 }
 
-pub fn handle_xrange(
+pub(crate) fn handle_xrange(
     db: &Arc<StoreEngine>,
     cmd: Arc<RwLock<RespMessage>>,
 ) -> Result<CommandHandlerResponse> {
     let mut resp_vec = Vec::new();
     let cmd_len = cmd.read().unwrap().vec_data.len();
-    if cmd_len > 3 {
-        let k = &cmd.read().unwrap().vec_data[1].str_data;
-        let from = &cmd.read().unwrap().vec_data[2].str_data;
-        let to = &cmd.read().unwrap().vec_data[3].str_data;
-        let from_stream_key = match StreamID::validate(&from) {
-            StreamIDState::Ok => StreamID::from(from.clone().as_str()),
-            StreamIDState::MillisecondOnly(ts) => StreamID::new(ts, 0),
-            StreamIDState::FirstStreamID(sid) => sid,
-            _ => return Err(anyhow::anyhow!("invalid stream id")),
-        };
-
-        let to_stream_key = match StreamID::validate(&to) {
-            StreamIDState::Ok => StreamID::from(to.clone().as_str()),
-            StreamIDState::MillisecondOnly(ts) => StreamID::new(ts, 0),
-            StreamIDState::LastStreamID => match db.get_last_stream_id(k.clone()) {
-                Some(sid) => sid,
-                None => StreamID::default(),
-            },
-            _ => return Err(anyhow::anyhow!("invalid stream id")),
-        };
-
-        // println!("from {:?} to {:?}", from_stream_key, to_stream_key);
-
-        let stream_range = db.get_stream_by_range(k.clone(), &from_stream_key, &to_stream_key);
-        // println!("{:?}", array_to_resp_array_for_xrange(&stream_range));
-
-        resp_vec.push(
-            array_to_resp_array_for_xrange(&stream_range)
-                .as_bytes()
-                .to_vec(),
-        );
-
-        Ok(CommandHandlerResponse::Basic(resp_vec))
-    } else {
-        Err(anyhow::anyhow!("command too short"))
+    if cmd_len < 4 {
+        return Err(anyhow::anyhow!("command too short"));
     }
+
+    let k = &cmd.read().unwrap().vec_data[1].str_data;
+    let from = &cmd.read().unwrap().vec_data[2].str_data;
+    let to = &cmd.read().unwrap().vec_data[3].str_data;
+    let from_stream_key = match StreamID::validate(from) {
+        StreamIDState::Ok => StreamID::from(from.clone().as_str()),
+        StreamIDState::MillisecondOnly(ts) => StreamID::new(ts, 0),
+        StreamIDState::FirstStreamID(sid) => sid,
+        _ => return Err(anyhow::anyhow!("invalid stream id")),
+    };
+
+    let to_stream_key = match StreamID::validate(to) {
+        StreamIDState::Ok => StreamID::from(to.clone().as_str()),
+        StreamIDState::MillisecondOnly(ts) => StreamID::new(ts, 0),
+        StreamIDState::LastStreamID => db.get_last_stream_id(k.clone()).unwrap_or_default(),
+        _ => return Err(anyhow::anyhow!("invalid stream id")),
+    };
+
+    // println!("from {:?} to {:?}", from_stream_key, to_stream_key);
+
+    let stream_range = db.get_stream_by_range(k.clone(), &from_stream_key, &to_stream_key);
+    // println!("{:?}", array_to_resp_array_for_xrange(&stream_range));
+
+    resp_vec.push(
+        array_to_resp_array_for_xrange(&stream_range)
+            .as_bytes()
+            .to_vec(),
+    );
+
+    Ok(CommandHandlerResponse::Basic(resp_vec))
+}
+
+pub(crate) fn handle_xread(
+    db: &Arc<StoreEngine>,
+    cmd: Arc<RwLock<RespMessage>>,
+) -> Result<CommandHandlerResponse> {
+    let mut resp_vec = Vec::new();
+    let cmd_len = cmd.read().unwrap().vec_data.len();
+    if cmd_len < 4 {
+        return Err(anyhow::anyhow!("command too short"));
+    }
+
+    Ok(CommandHandlerResponse::Basic(resp_vec))
 }

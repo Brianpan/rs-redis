@@ -225,57 +225,50 @@ impl StoreEngine {
 
             // read the command
             loop {
-                match reader.read(&mut buf).await {
-                    Ok(buf_len) => {
-                        if buf_len == 0 {
-                            break;
+                let Ok(buf_len) = reader.read(&mut buf).await else {
+                    continue;
+                };
+
+                if buf_len == 0 {
+                    break;
+                }
+
+                let Ok(cmds) = command_parser(&mut buf[..buf_len]) else {
+                    continue;
+                };
+
+                // println!("cmds: {:?}", cmds);
+
+                for cmd in cmds {
+                    match cmd.clone() {
+                        RespCommandType::Set(key, value) => {
+                            self.set(key, value);
                         }
+                        RespCommandType::SetPx(key, value, ttl) => {
+                            self.set_with_expire(key, value, ttl.into());
+                        }
+                        // reply ack with offset to the master
+                        RespCommandType::Replconf(key) => {
+                            // println!("receive healthcheck from master");
+                            if key == "getack" {
+                                // send ack to master
+                                let ack_offset = self.slave_info.read().unwrap().slave_repl_offset;
 
-                        match command_parser(&mut buf[..buf_len]) {
-                            Ok(cmds) => {
-                                // println!("cmds: {:?}", cmds);
-
-                                for cmd in cmds {
-                                    match cmd.clone() {
-                                        RespCommandType::Set(key, value) => {
-                                            self.set(key, value);
-                                        }
-                                        RespCommandType::SetPx(key, value, ttl) => {
-                                            self.set_with_expire(key, value, ttl.into());
-                                        }
-                                        // reply ack with offset to the master
-                                        RespCommandType::Replconf(key) => {
-                                            // println!("receive healthcheck from master");
-                                            if key == "getack" {
-                                                // send ack to master
-                                                let ack_offset = self
-                                                    .slave_info
-                                                    .read()
-                                                    .unwrap()
-                                                    .slave_repl_offset;
-
-                                                let ack_cmd = array_to_resp_array(vec![
-                                                    "REPLCONF".to_string(),
-                                                    "ACK".to_string(),
-                                                    format!("{}", ack_offset),
-                                                ]);
-                                                writer.write(ack_cmd.as_bytes()).await?;
-                                                writer.flush().await?;
-                                            }
-                                        }
-                                        _ => {}
-                                    }
-
-                                    // add offset to the slave
-                                    let cmd_offset = count_resp_command_type_offset(cmd) as u64;
-                                    (*self.slave_info.write().unwrap()).slave_repl_offset +=
-                                        cmd_offset;
-                                }
+                                let ack_cmd = array_to_resp_array(vec![
+                                    "REPLCONF".to_string(),
+                                    "ACK".to_string(),
+                                    format!("{}", ack_offset),
+                                ]);
+                                writer.write(ack_cmd.as_bytes()).await?;
+                                writer.flush().await?;
                             }
-                            Err(_) => {}
                         }
+                        _ => {}
                     }
-                    Err(_) => {}
+
+                    // add offset to the slave
+                    let cmd_offset = count_resp_command_type_offset(cmd) as u64;
+                    self.slave_info.write().unwrap().slave_repl_offset += cmd_offset;
                 }
             }
         }
@@ -290,7 +283,7 @@ impl Default for StoreEngine {
     }
 }
 
-#[derive(Clone, Eq, Hash, PartialEq, Ord, Debug)]
+#[derive(Clone, Eq, Hash, PartialEq, Debug, Default)]
 pub struct StreamID {
     pub millisecond: u128,
     pub sequence: u64,
@@ -391,19 +384,16 @@ impl StreamID {
 
 impl PartialOrd for StreamID {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        if self.millisecond == other.millisecond {
-            return Some(self.sequence.cmp(&other.sequence));
-        }
-
-        Some(self.millisecond.cmp(&other.millisecond))
+        Some(self.cmp(other))
     }
 }
 
-impl Default for StreamID {
-    fn default() -> Self {
-        StreamID {
-            millisecond: 0,
-            sequence: 0,
+impl Ord for StreamID {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.millisecond == other.millisecond {
+            return self.sequence.cmp(&other.sequence);
         }
+
+        self.millisecond.cmp(&other.millisecond)
     }
 }
