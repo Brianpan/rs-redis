@@ -520,8 +520,10 @@ pub(crate) fn handle_xread(
         let mut xadd_arr = Vec::with_capacity(key_vec.len());
         for idx in 0..key_vec.len() {
             let key = key_vec[idx].clone();
-            let id = id_vec[idx].clone();
-            let stream_range = db.get_stream_by_range(key.clone(), &id, &StreamID::default());
+            let from_stream_key = id_vec[idx].clone();
+            let to_stream_key = db.get_last_stream_id(key.clone()).unwrap_or_default();
+            let stream_range =
+                db.get_stream_by_range(key.clone(), &from_stream_key, &to_stream_key);
 
             let key_stream_wrap = xrange_to_read_wrap(
                 key.as_str(),
