@@ -489,7 +489,52 @@ pub(crate) fn handle_xread(
         return Err(anyhow::anyhow!("command too short"));
     }
 
-    // 1 is streams
+    // 1 is streams which allows return multiple streams
+    if cmd.read().unwrap().vec_data[1].str_data.as_str() == "streams" {
+        let mut key_vec = Vec::new();
+        let mut id_vec = Vec::new();
+
+        for i in 2..cmd_len {
+            let v = &cmd.read().unwrap().vec_data[i].str_data;
+            match StreamID::validate(v) {
+                StreamIDState::Ok => {
+                    id_vec.push(StreamID::from(v.clone().as_str()));
+                }
+                StreamIDState::MillisecondOnly(ts) => {
+                    id_vec.push(StreamID::new(ts, 0));
+                }
+                StreamIDState::FirstStreamID(sid) => {
+                    id_vec.push(sid);
+                }
+                _ => {
+                    key_vec.push(v.clone());
+                }
+            }
+        }
+
+        // the key and id should be in pair
+        if key_vec.len() != id_vec.len() {
+            return Err(anyhow::anyhow!("key and id mismatch"));
+        }
+
+        let mut xadd_arr = Vec::with_capacity(key_vec.len());
+        for idx in 0..key_vec.len() {
+            let key = key_vec[idx].clone();
+            let id = id_vec[idx].clone();
+            let stream_range = db.get_stream_by_range(key.clone(), &id, &StreamID::default());
+
+            let key_stream_wrap = xrange_to_read_wrap(
+                key.as_str(),
+                array_to_resp_array_for_xrange(&stream_range).as_str(),
+            );
+            xadd_arr.push(key_stream_wrap);
+        }
+
+        resp_vec.push(array_to_simple_resp_array(xadd_arr).as_bytes().to_vec());
+        return Ok(CommandHandlerResponse::Basic(resp_vec));
+    }
+
+    // stream case
     let k = &cmd.read().unwrap().vec_data[2].str_data;
     let from = &cmd.read().unwrap().vec_data[3].str_data;
 
