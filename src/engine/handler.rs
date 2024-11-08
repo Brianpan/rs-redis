@@ -479,6 +479,13 @@ pub(crate) fn handle_xrange(
     Ok(CommandHandlerResponse::Basic(resp_vec))
 }
 
+#[derive(PartialEq)]
+enum XReadMode {
+    Block,
+    Stream,
+    Streams,
+}
+
 pub(crate) fn handle_xread(
     db: &Arc<StoreEngine>,
     cmd: Arc<RwLock<RespMessage>>,
@@ -488,13 +495,39 @@ pub(crate) fn handle_xread(
     if cmd_len < 4 {
         return Err(anyhow::anyhow!("command too short"));
     }
+    // block case which has several cases
+    // 1. has data: return immediately
+    // 2. no data: wait for period of time. if no data return nil
 
     // 1 is streams which allows return multiple streams
-    if cmd.read().unwrap().vec_data[1].str_data.as_str() == "streams" {
+    let xread_mode;
+    xread_mode = match cmd.read().unwrap().vec_data[1].str_data.as_str() {
+        "streams" => XReadMode::Streams,
+        "block" => XReadMode::Block,
+        _ => XReadMode::Stream,
+    };
+
+    let mut waiting_time = 0;
+    let mut start_key = 2;
+    match xread_mode {
+        XReadMode::Block => {
+            waiting_time = match cmd.read().unwrap().vec_data[2].str_data.parse::<u64>() {
+                Ok(t) => t,
+                Err(_) => return Err(anyhow::anyhow!("invalid waiting time")),
+            };
+            start_key = 3;
+        }
+        XReadMode::Streams => {
+            start_key = 2;
+        }
+        _ => {}
+    };
+
+    if xread_mode == XReadMode::Block || xread_mode == XReadMode::Streams {
         let mut key_vec = Vec::new();
         let mut id_vec = Vec::new();
 
-        for i in 2..cmd_len {
+        for i in start_key..cmd_len {
             let v = &cmd.read().unwrap().vec_data[i].str_data;
             match StreamID::validate(v) {
                 StreamIDState::Ok => {
