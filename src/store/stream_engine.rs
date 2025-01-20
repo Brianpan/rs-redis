@@ -1,8 +1,8 @@
 use super::engine::{StoreEngine, StreamID};
+use crate::engine::{array_to_resp_array_for_xrange, xrange_to_read_wrap};
 use anyhow::*;
-use core::ops::Bound::Included;
+use core::ops::Bound::{Excluded, Included};
 use std::collections::{BTreeMap, HashMap};
-
 #[derive(Debug)]
 pub struct StreamRange {
     pub stream_id: StreamID,
@@ -34,6 +34,13 @@ pub trait StreamEngine {
         start: &StreamID,
         end: &StreamID,
     ) -> Vec<StreamRange>;
+
+    fn get_xread(&self, k: impl AsRef<str>, start: &StreamID) -> Vec<StreamRange>;
+    fn get_xread_streams(
+        &self,
+        keys: Vec<String>,
+        stream_ids: Vec<StreamID>,
+    ) -> Result<Vec<String>>;
 }
 
 impl StreamEngine for StoreEngine {
@@ -119,6 +126,15 @@ impl StreamEngine for StoreEngine {
         let key = k.as_ref().to_string();
 
         if let Some(id_map) = self.stream_dict.read().unwrap().get(&key) {
+            // empty check
+            if let Some((k, _v)) = id_map.last_key_value() {
+                if k < start {
+                    return vec;
+                }
+            } else {
+                return vec;
+            }
+
             id_map
                 .range((Included(start), Included(end)))
                 .for_each(|(id, hash)| {
@@ -130,5 +146,57 @@ impl StreamEngine for StoreEngine {
         }
 
         vec
+    }
+
+    fn get_xread(&self, k: impl AsRef<str>, start: &StreamID) -> Vec<StreamRange> {
+        let mut vec = Vec::new();
+        let key = k.as_ref().to_string();
+
+        if let Some(id_map) = self.stream_dict.read().unwrap().get(&key) {
+            // empty check
+            if let Some((end, _v)) = id_map.last_key_value() {
+                if end < start {
+                    return vec;
+                }
+
+                id_map
+                    .range((Excluded(start), Included(end)))
+                    .for_each(|(id, hash)| {
+                        vec.push(StreamRange {
+                            stream_id: id.clone(),
+                            hash: hash.clone(),
+                        })
+                    });
+            } else {
+                return vec;
+            }
+        }
+
+        vec
+    }
+
+    fn get_xread_streams(
+        &self,
+        keys: Vec<String>,
+        stream_ids: Vec<StreamID>,
+    ) -> Result<Vec<String>> {
+        let mut xread_arr = Vec::with_capacity(keys.len());
+
+        for idx in 0..keys.len() {
+            let key = keys[idx].clone();
+            let from_stream_key = stream_ids[idx].clone();
+            let stream_range = self.get_xread(key.clone(), &from_stream_key);
+            if stream_range.is_empty() {
+                continue;
+            }
+
+            let key_stream_wrap = xrange_to_read_wrap(
+                key.as_str(),
+                array_to_resp_array_for_xrange(&stream_range).as_str(),
+            );
+            xread_arr.push(key_stream_wrap);
+        }
+
+        Ok(xread_arr)
     }
 }

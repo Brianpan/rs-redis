@@ -1,9 +1,10 @@
 use super::commands::command_handler;
-use super::{RespMessage, RespParsingState, RespType};
+use super::{array_to_simple_resp_array, RespMessage, RespParsingState, RespType, RESP_NULL};
 use crate::engine::CommandHandlerResponse;
 use crate::store::engine::StoreEngine;
 use crate::store::master_engine::MasterEngine;
 use crate::store::replicator::ReplicatorHandle;
+use crate::store::stream_engine::{StreamEngine, StreamRange};
 use std::collections::VecDeque;
 use std::sync::{Arc, RwLock};
 
@@ -183,6 +184,28 @@ async fn command_handler_callback(
             let replicator_follow_count = actor.wait_op(wait_count, wait_time).await;
             let ret = format!(":{}\r\n", replicator_follow_count);
             stream.lock().await.write_all(ret.as_bytes()).await.unwrap();
+        }
+        CommandHandlerResponse::StreamBlock {
+            ms,
+            key_vec,
+            stream_id_vec,
+        } => {
+            tokio::time::sleep(tokio::time::Duration::from_millis(ms)).await;
+            let xread_arr = db.get_xread_streams(key_vec, stream_id_vec).unwrap();
+            if xread_arr.is_empty() {
+                stream
+                    .lock()
+                    .await
+                    .write_all(RESP_NULL.as_bytes())
+                    .await
+                    .unwrap();
+                return;
+            }
+            let resp_vec = vec![array_to_simple_resp_array(xread_arr).as_bytes().to_vec()];
+
+            for resp in resp_vec {
+                stream.lock().await.write_all(&resp).await.unwrap();
+            }
         }
     }
 }

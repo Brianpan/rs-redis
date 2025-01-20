@@ -5,7 +5,7 @@ pub mod parser;
 
 use hex;
 
-use crate::store::stream_engine::StreamRange;
+use crate::store::{engine::StreamID, stream_engine::StreamRange};
 
 // const CRLR: &str = "\r\n";
 
@@ -13,6 +13,7 @@ const RESP_OK: &str = "+OK\r\n";
 const RESP_ERR: &str = "-ERR\r\n";
 const RESP_PONG: &str = "+PONG\r\n";
 const RESP_EMPTY: &str = "*0\r\n";
+const RESP_NULL: &str = "$-1\r\n";
 
 // hardcoded lenth
 pub const PING_LEN: usize = 14;
@@ -72,6 +73,13 @@ pub enum CommandHandlerResponse {
         _message: Vec<Vec<u8>>,
         wait_time: u64,
         wait_count: u64,
+    },
+
+    // for xread block async operation
+    StreamBlock {
+        ms: u64,
+        key_vec: Vec<String>,
+        stream_id_vec: Vec<StreamID>,
     },
 }
 

@@ -515,7 +515,8 @@ pub(crate) fn handle_xread(
                 Ok(t) => t,
                 Err(_) => return Err(anyhow::anyhow!("invalid waiting time")),
             };
-            start_key = 3;
+            // expect to have another streams string
+            start_key = 4;
         }
         XReadMode::Streams => {
             start_key = 2;
@@ -549,23 +550,21 @@ pub(crate) fn handle_xread(
         if key_vec.len() != id_vec.len() {
             return Err(anyhow::anyhow!("key and id mismatch"));
         }
-
-        let mut xadd_arr = Vec::with_capacity(key_vec.len());
-        for idx in 0..key_vec.len() {
-            let key = key_vec[idx].clone();
-            let from_stream_key = id_vec[idx].clone();
-            let to_stream_key = db.get_last_stream_id(key.clone()).unwrap_or_default();
-            let stream_range =
-                db.get_stream_by_range(key.clone(), &from_stream_key, &to_stream_key);
-
-            let key_stream_wrap = xrange_to_read_wrap(
-                key.as_str(),
-                array_to_resp_array_for_xrange(&stream_range).as_str(),
-            );
-            xadd_arr.push(key_stream_wrap);
+        // for block case
+        // let actor handle this
+        // special response type for handler
+        if xread_mode == XReadMode::Block {
+            return Ok(CommandHandlerResponse::StreamBlock {
+                ms: waiting_time,
+                key_vec,
+                stream_id_vec: id_vec,
+            });
         }
 
-        resp_vec.push(array_to_simple_resp_array(xadd_arr).as_bytes().to_vec());
+        // for streams case
+        let xread_arr = db.get_xread_streams(key_vec, id_vec)?;
+        resp_vec.push(array_to_simple_resp_array(xread_arr).as_bytes().to_vec());
+
         return Ok(CommandHandlerResponse::Basic(resp_vec));
     }
 
@@ -582,8 +581,7 @@ pub(crate) fn handle_xread(
 
     // we need to pack one more layer of array for xread
 
-    let to_stream_key = db.get_last_stream_id(k.clone()).unwrap_or_default();
-    let stream_range = db.get_stream_by_range(k.clone(), &from_stream_key, &to_stream_key);
+    let stream_range = db.get_xread(k, &from_stream_key);
     let key_stream_wrap = xrange_to_read_wrap(
         k.as_str(),
         array_to_resp_array_for_xrange(&stream_range).as_str(),
